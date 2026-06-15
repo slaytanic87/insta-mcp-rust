@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "instagram-rust": {
+      "command": "cargo",
+      "args": [
+        "run",
+        "--release",
+        "--manifest-path",
+        "/path/to/ig-mcp/ig-mcp-rust/Cargo.toml"
+      ],
+      "env": {
+        "INSTAGRAM_ACCESS_TOKEN": "your_long_lived_access_token",
+        "FACEBOOK_APP_ID": "your_facebook_app_id",
+        "FACEBOOK_APP_SECRET": "your_facebook_app_secret",
+        "INSTAGRAM_BUSINESS_ACCOUNT_ID": "your_instagram_business_account_id",
+        "LOG_LEVEL": "INFO"
+      }
+    }
+  }
+}
