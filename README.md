@@ -20,9 +20,9 @@ This project is a Rust port of the [Python Instagram MCP server](https://github.
 ## Project Layout
 
 ```
-ig-mcp-rust/
+insta-mcp-rust/
 ├── Cargo.toml
-├── .env.example
+├── .env
 ├── config/
 │   └── mcp_client_config.json
 └── src/
@@ -31,7 +31,8 @@ ig-mcp-rust/
     ├── error.rs
     ├── models.rs
     ├── instagram_client.rs
-    └── mcp_server.rs
+    └── mcp_server_stdio.rs
+    └── mcp_server_sse.rs
 ```
 
 ## Setup
@@ -47,8 +48,16 @@ cp .env.example .env
 
 ## Run
 
+1) Run Stdio mode
+
 ```bash
 cargo run
+```
+
+2) Run Sse mode
+
+```bash
+cargo run -- sse
 ```
 
 The server reads JSON-RPC requests from stdin and writes JSON-RPC responses to stdout.
@@ -71,12 +80,12 @@ cargo build --release
 - **Get Conversation Messages**: Read messages from specific conversations (requires Advanced Access)
 - **Send DM**: Reply to Instagram direct messages (requires Advanced Access)
 
-### 📊 Resources (Application-controlled)
+### 📊 Resources (Application-controlled) (Stdio only)
 - **Profile Data**: Access to profile information including follower counts, bio, etc.
 - **Media Feed**: Recent posts with engagement metrics
 - **Insights Data**: Detailed analytics for posts and account performance
 
-### 💬 Prompts (User-controlled)
+### 💬 Prompts (User-controlled)  (Stdio only)
 - **Analyze Engagement**: Pre-built prompt for analyzing post performance
 - **Content Strategy**: Template for generating content recommendations
 - **Hashtag Analysis**: Prompt for hashtag performance evaluation
@@ -86,7 +95,7 @@ cargo build --release
 1. **Instagram Business Account**: Must be connected to a Facebook Page
 2. **Facebook Developer Account**: Required for API access
 3. **Access Token**: Long-lived access token with appropriate permissions
-4. **Python 3.10+**: For running the MCP server (required by MCP dependencies)
+4. **Rustc / Cargo 1.95.0+**: For compiling the MCP server (required by MCP dependencies)
 
 ### Required Instagram API Permissions
 
