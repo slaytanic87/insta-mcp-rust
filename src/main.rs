@@ -49,7 +49,7 @@ async fn main() {
         info!("Instagram access token validated successfully");
     }
 
-    if !args.is_empty() && args.first().unwrap() == "sse" {
+    if !args.is_empty() && args[1] == "sse" {
         info!(args = ?args, "Command-line arguments provided, starting server with arguments");
         mcp_server_run_sse(settings, client).await;
     } else {
