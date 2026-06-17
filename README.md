@@ -16,6 +16,8 @@ This project is a Rust port of the [Python Instagram MCP server](https://github.
   - tools (`tools/list`, `tools/call`)
   - resources (`resources/list`, `resources/read`)
   - prompts (`prompts/list`, `prompts/get`)
+- MCP-style sse JSON-RPC server exposing:
+  - tools (`tools/list`, `tools/call`)
 
 ## Project Layout
 
@@ -48,19 +50,21 @@ cp .env.example .env
 
 ## Run
 
-1) Run Stdio mode
+1.1) Run Stdio mode
 
 ```bash
 cargo run
 ```
 
-2) Run Sse mode
+or
+
+1.2) Run Sse mode
 
 ```bash
 cargo run -- sse
 ```
 
-The server reads JSON-RPC requests from stdin and writes JSON-RPC responses to stdout.
+The server reads JSON-RPC requests from stdin/sse event stream and writes JSON-RPC responses to stdout/event stream.
 
 ## Build
 
