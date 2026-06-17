@@ -474,4 +474,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - [Model Context Protocol](https://modelcontextprotocol.io/) by Anthropic
 - [Instagram Graph API](https://developers.facebook.com/docs/instagram-api/) by Meta
-- [FastMCP](https://github.com/jlowin/fastmcp) for rapid MCP development 
