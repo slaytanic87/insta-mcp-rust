@@ -18,7 +18,7 @@ use crate::{
     },
 };
 
-static SSE_CLIENT: OnceLock<Arc<InstagramClient>> = OnceLock::new();
+static INSTAGRAM_CLIENT: OnceLock<Arc<InstagramClient>> = OnceLock::new();
 
 fn get_profile_info() -> Tool {
     Tool {
@@ -179,7 +179,7 @@ fn get_profile_info_handler(
     request: CallToolRequest,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = CallToolResponse> + Send + 'static>> {
     Box::pin(async move {
-        let client = SSE_CLIENT
+        let client = INSTAGRAM_CLIENT
             .get()
             .expect("SSE client must be initialized before tool handlers run");
 
@@ -199,7 +199,7 @@ fn get_media_posts_handler(
     request: CallToolRequest,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = CallToolResponse> + Send + 'static>> {
     Box::pin(async move {
-        let client = SSE_CLIENT
+        let client = INSTAGRAM_CLIENT
             .get()
             .expect("SSE client must be initialized before tool handlers run");
         let account_id = request
@@ -235,7 +235,7 @@ fn get_media_insights_handler(
     request: CallToolRequest,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = CallToolResponse> + Send + 'static>> {
     Box::pin(async move {
-        let client = SSE_CLIENT
+        let client = INSTAGRAM_CLIENT
             .get()
             .expect("SSE client must be initialized before tool handlers run");
         let media_id: String = request
@@ -282,7 +282,7 @@ fn publish_media_handler(
     request: CallToolRequest,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = CallToolResponse> + Send + 'static>> {
     Box::pin(async move {
-        let client = SSE_CLIENT
+        let client = INSTAGRAM_CLIENT
             .get()
             .expect("SSE client must be initialized before tool handlers run");
         let request: PublishMediaRequest =
@@ -297,7 +297,7 @@ fn get_account_pages_handler(
     _: CallToolRequest,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = CallToolResponse> + Send + 'static>> {
     Box::pin(async move {
-        let client = SSE_CLIENT
+        let client = INSTAGRAM_CLIENT
             .get()
             .expect("SSE client must be initialized before tool handlers run");
         let pages = client.get_account_pages().await.unwrap();
@@ -308,7 +308,7 @@ fn get_account_pages_handler(
 fn get_account_insights_handler(
     request: CallToolRequest,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = CallToolResponse> + Send + 'static>> {
-    let client = SSE_CLIENT
+    let client = INSTAGRAM_CLIENT
         .get()
         .expect("SSE client must be initialized before tool handlers run");
     let client = Arc::clone(&client);
@@ -355,7 +355,7 @@ fn validate_access_token_handler(
     _: CallToolRequest,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = CallToolResponse> + Send + 'static>> {
     Box::pin(async move {
-        let client = SSE_CLIENT
+        let client = INSTAGRAM_CLIENT
             .get()
             .expect("SSE client must be initialized before tool handlers run");
         let valid: bool = client.validate_access_token().await;
@@ -367,7 +367,7 @@ fn get_conversations_handler(
     request: CallToolRequest,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = CallToolResponse> + Send + 'static>> {
     Box::pin(async move {
-        let client = SSE_CLIENT
+        let client = INSTAGRAM_CLIENT
             .get()
             .expect("SSE client must be initialized before tool handlers run");
         let page_id = request
@@ -396,7 +396,7 @@ fn get_conversation_messages_handler(
     request: CallToolRequest,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = CallToolResponse> + Send + 'static>> {
     Box::pin(async move {
-        let client = SSE_CLIENT
+        let client = INSTAGRAM_CLIENT
             .get()
             .expect("SSE client must be initialized before tool handlers run");
 
@@ -432,7 +432,7 @@ fn send_dm_handler(
     request: CallToolRequest,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = CallToolResponse> + Send + 'static>> {
     Box::pin(async move {
-        let client = SSE_CLIENT
+        let client = INSTAGRAM_CLIENT
             .get()
             .expect("SSE client must be initialized before tool handlers run");
         let request: SendDmRequest =
@@ -444,7 +444,7 @@ fn send_dm_handler(
 }
 
 pub async fn mcp_server_run_sse(settings: Arc<Settings>, client: Arc<InstagramClient>) {
-    let _ = SSE_CLIENT.set(Arc::clone(&client));
+    let _ = INSTAGRAM_CLIENT.set(Arc::clone(&client));
 
     let server_protocol = Server::builder(
         settings.mcp_server_name.clone(),
