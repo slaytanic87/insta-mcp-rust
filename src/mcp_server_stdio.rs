@@ -11,7 +11,7 @@ use crate::config::Settings;
 use crate::error::AppError;
 use crate::instagram_client::InstagramClient;
 use crate::models::{
-    InsightMetric, InsightPeriod, McpToolResult, PromptArgument, PromptDefinition,
+    InsightMetric, InsightPeriod, InstagramMedia, McpToolResult, PromptArgument, PromptDefinition,
     PublishMediaRequest, ResourceDefinition, SendDmRequest, SendDmResponse, ToolDefinition,
 };
 
@@ -284,7 +284,7 @@ impl InstagramMcpServer {
                         .get("after")
                         .and_then(Value::as_str)
                         .map(str::to_string);
-                    let posts = self
+                    let posts: Vec<InstagramMedia> = self
                         .client
                         .get_media_posts(account_id, limit, after)
                         .await?;

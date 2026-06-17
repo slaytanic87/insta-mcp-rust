@@ -1,19 +1,23 @@
 mod config;
 mod error;
 mod instagram_client;
-mod mcp_server;
+mod mcp_server_sse;
+mod mcp_server_stdio;
 mod models;
 
 use std::sync::Arc;
 
 use config::Settings;
 use instagram_client::InstagramClient;
-use mcp_server::InstagramMcpServer;
+use mcp_server_stdio::InstagramMcpServer;
 use tracing::{error, info, warn};
+
+use crate::mcp_server_sse::mcp_server_run_sse;
 
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
+    let args: Vec<String> = std::env::args().collect();
 
     let settings = match Settings::from_env() {
         Ok(s) => Arc::new(s),
@@ -45,9 +49,15 @@ async fn main() {
         info!("Instagram access token validated successfully");
     }
 
-    let server = InstagramMcpServer::new(settings, client);
-    if let Err(e) = server.run_stdio().await {
-        error!(error = %e, "Server exited with error");
+    if !args.is_empty() && args.first().unwrap() == "sse" {
+        info!(args = ?args, "Command-line arguments provided, starting server with arguments");
+        mcp_server_run_sse(settings, client).await;
+    } else {
+        info!("No command-line arguments provided, starting server in normal mode");
+        let server = InstagramMcpServer::new(settings, client);
+        if let Err(e) = server.run_stdio().await {
+            error!(error = %e, "Server exited with error");
+        }
         std::process::exit(1);
     }
 }

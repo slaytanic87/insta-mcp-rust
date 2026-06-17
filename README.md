@@ -2,7 +2,7 @@
 
 A Rust based Model Context Protocol (MCP) server that provides seamless integration with Instagram's Graph API, enabling AI applications to interact with Instagram Business accounts programmatically.
 
-This project is a Rust 2024 port of the [Python Instagram MCP server](https://github.com/jlbadano/ig-mcp).
+This project is a Rust port of the [Python Instagram MCP server](https://github.com/jlbadano/ig-mcp).
 
 ## What Is Included
 
@@ -322,8 +322,8 @@ Add this to your MCP client configuration (e.g., Claude Desktop):
 {
   "mcpServers": {
     "instagram": {
-      "command": "python",
-      "args": ["/path/to/ig-mcp/src/instagram_mcp_server.py"],
+      "command": "./path/to/insta-mcp-rust/release/insta-mcp-rust",
+      "args": [],
       "env": {
         "INSTAGRAM_ACCESS_TOKEN": "your_access_token"
       }
