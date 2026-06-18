@@ -1,11 +1,19 @@
 use std::sync::{Arc, OnceLock};
 
-use mcp_core::{
-    server::Server,
-    tool_text_response,
-    transport::ServerSseTransport,
-    types::{CallToolRequest, CallToolResponse, ServerCapabilities, Tool, ToolCapabilities},
+use rmcp::{
+    ErrorData as McpError, RoleServer, ServerHandler,
+    handler::server::{tool::ToolRouter, wrapper::Parameters},
+    model::{CallToolResult, Content, InitializeRequestParams, InitializeResult, Meta},
+    prompt, prompt_handler, schemars,
+    service::RequestContext,
+    task_handler, tool, tool_handler, tool_router,
+    transport::{
+        StreamableHttpServerConfig, StreamableHttpService,
+        streamable_http_server::session::local::LocalSessionManager,
+    },
 };
+
+use serde::Deserialize;
 use serde_json::Value;
 
 use crate::{
@@ -19,7 +27,7 @@ use crate::{
 };
 
 static INSTAGRAM_CLIENT: OnceLock<Arc<InstagramClient>> = OnceLock::new();
-
+/*
 fn get_profile_info() -> Tool {
     Tool {
             name: "get_profile_info".to_string(),
@@ -127,7 +135,7 @@ fn validate_access_token() -> Tool {
 
 fn get_conversations() -> Tool {
     Tool {
-        name: "validate_access_token".to_string(),
+        name: "get_conversations".to_string(),
         description: Some(
             "Get Instagram DM conversations (requires instagram_manage_messages Advanced Access)"
                 .to_string(),
@@ -174,302 +182,176 @@ fn send_dm() -> Tool {
         annotations: None,
     }
 }
+*/
 
-fn get_profile_info_handler(
-    request: CallToolRequest,
-) -> std::pin::Pin<Box<dyn std::future::Future<Output = CallToolResponse> + Send + 'static>> {
-    Box::pin(async move {
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct GetProfileInfo {
+    #[schemars(description = "Instagram business account ID (optional)")]
+    account_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct GetMediaPosts {
+    #[schemars(description = "Instagram business account ID (optional)")]
+    account_id: Option<String>,
+    #[schemars(
+        description = "Maximum number of media posts to retrieve (minimum = 1, maximum = 100, default = 25)"
+    )]
+    limit: Option<u32>,
+    after: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct GetMediaInsights {
+    #[schemars(description = "Instagram media ID to retrieve insights for")]
+    media_id: String,
+    #[schemars(
+        description = "List of metrics to retrieve insights for (e.g. reach, likes, comments, shares, saved, video_views)"
+    )]
+    metrics: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct PublishMedia {
+    #[schemars(
+        description = "URL of the image to publish (required if video_url is not provided)"
+    )]
+    image_url: Option<String>,
+    #[schemars(
+        description = "URL of the video to publish (required if image_url is not provided)"
+    )]
+    video_url: Option<String>,
+    #[schemars(description = "Caption for the media post")]
+    caption: Option<String>,
+    #[schemars(description = "Location ID to tag in the media post")]
+    location_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct GetAccountPages {}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct GetAccountInsights {
+    #[schemars(description = "Instagram business account ID to retrieve insights for")]
+    account_id: Option<String>,
+    #[schemars(
+        description = "List of metrics to retrieve insights for (e.g. followers_count, impressions, reach)"
+    )]
+    metrics: Option<Vec<String>>,
+    #[schemars(description = "Time period for insights data (day, lifetime - default: day)")]
+    period: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct ValidateAccessToken {}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct GetConversations {
+    #[schemars(description = "Facebook page ID to retrieve conversations for")]
+    page_id: Option<String>,
+    #[schemars(
+        description = "Maximum number of conversations to retrieve (minimum = 1, maximum = 100, default = 25)"
+    )]
+    limit: Option<u32>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct GetConversationMessages {
+    #[schemars(description = "Instagram DM conversation ID to retrieve messages for")]
+    conversation_id: String,
+    #[schemars(
+        description = "Maximum number of messages to retrieve (minimum = 1, maximum = 100, default = 25)"
+    )]
+    limit: Option<u32>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct SendDm {
+    #[schemars(description = "Recipient Instagram user ID to send the DM to")]
+    recipient_id: String,
+    #[schemars(
+        description = "Message content to send in the DM (maximum length: 1000 characters)"
+    )]
+    message: String,
+}
+
+#[derive(Debug, Clone)]
+struct InstagramMcpServerSse {
+    tool_router: ToolRouter<InstagramMcpServerSse>,
+}
+
+#[tool_router]
+impl InstagramMcpServerSse {
+    pub fn new() -> Self {
+        Self {
+            tool_router: Self::tool_router(),
+        }
+    }
+
+    #[tool(
+        description = "Get Instagram business profile information including followers, bio, and account details"
+    )]
+    async fn get_profile_info(
+        &self,
+        Parameters(GetProfileInfo { account_id }): Parameters<GetProfileInfo>,
+    ) -> String {
         let client = INSTAGRAM_CLIENT
             .get()
             .expect("SSE client must be initialized before tool handlers run");
+        let profile_info = client.get_profile_info(account_id).await.unwrap();
+        serde_json::json!(profile_info).to_string()
+    }
 
-        let account_id = request
-            .arguments
-            .as_ref()
-            .unwrap()
-            .get("account_id")
-            .and_then(Value::as_str)
-            .map(str::to_string);
-        let profile: InstagramProfile = client.get_profile_info(account_id).await.unwrap();
-        tool_text_response!(serde_json::json!(profile))
-    })
+    /// Returns the `Mcp-Session-Id` of the current session (streamable HTTP only).
+    #[tool(description = "Get the session ID for this connection")]
+    fn get_session_id(&self, ctx: RequestContext<RoleServer>) -> Result<CallToolResult, McpError> {
+        let session_id = ctx
+            .extensions
+            .get::<axum::http::request::Parts>()
+            .and_then(|parts| parts.headers.get("mcp-session-id"))
+            .map(|v| v.to_str().unwrap_or("(non-ascii)").to_owned());
+        match session_id {
+            Some(id) => Ok(CallToolResult::success(vec![Content::text(id)])),
+            None => Ok(CallToolResult::success(vec![Content::text(
+                "No session (not running over streamable HTTP?)",
+            )])),
+        }
+    }
 }
 
-fn get_media_posts_handler(
-    request: CallToolRequest,
-) -> std::pin::Pin<Box<dyn std::future::Future<Output = CallToolResponse> + Send + 'static>> {
-    Box::pin(async move {
-        let client = INSTAGRAM_CLIENT
-            .get()
-            .expect("SSE client must be initialized before tool handlers run");
-        let account_id = request
-            .arguments
-            .as_ref()
-            .unwrap()
-            .get("account_id")
-            .and_then(Value::as_str)
-            .map(str::to_string);
-        let limit = request
-            .arguments
-            .as_ref()
-            .unwrap()
-            .get("limit")
-            .and_then(Value::as_u64)
-            .unwrap_or(25) as u32;
-        let after = request
-            .arguments
-            .as_ref()
-            .unwrap()
-            .get("after")
-            .and_then(Value::as_str)
-            .map(str::to_string);
-        let posts: Vec<InstagramMedia> = client
-            .get_media_posts(account_id, limit, after)
-            .await
-            .unwrap();
-        tool_text_response!(serde_json::json!({ "posts": posts, "count": posts.len() }))
-    })
+#[tool_handler(meta = Meta(rmcp::object!({"tool_meta_key": "tool_meta_value"})))]
+impl ServerHandler for InstagramMcpServerSse {
+    async fn initialize(
+        &self,
+        _request: InitializeRequestParams,
+        context: RequestContext<RoleServer>,
+    ) -> Result<InitializeResult, McpError> {
+        if let Some(http_request_part) = context.extensions.get::<axum::http::request::Parts>() {
+            let initialize_headers = &http_request_part.headers;
+            let initialize_uri = &http_request_part.uri;
+            tracing::info!(?initialize_headers, %initialize_uri, "initialize from http server");
+        }
+        Ok(self.get_info())
+    }
 }
 
-fn get_media_insights_handler(
-    request: CallToolRequest,
-) -> std::pin::Pin<Box<dyn std::future::Future<Output = CallToolResponse> + Send + 'static>> {
-    Box::pin(async move {
-        let client = INSTAGRAM_CLIENT
-            .get()
-            .expect("SSE client must be initialized before tool handlers run");
-        let media_id: String = request
-            .arguments
-            .as_ref()
-            .unwrap()
-            .get("media_id")
-            .and_then(Value::as_str)
-            .ok_or_else(|| AppError::Validation("media_id is required".to_string()))
-            .unwrap()
-            .to_string();
-
-        let metrics: Option<Vec<InsightMetric>> = request
-            .arguments
-            .as_ref()
-            .unwrap()
-            .get("metrics")
-            .and_then(Value::as_array)
-            .map(|items| {
-                items
-                    .iter()
-                    .filter_map(Value::as_str)
-                    .filter_map(|s| match s {
-                        "impressions" => Some(InsightMetric::Impressions),
-                        "reach" => Some(InsightMetric::Reach),
-                        "likes" => Some(InsightMetric::Likes),
-                        "comments" => Some(InsightMetric::Comments),
-                        "shares" => Some(InsightMetric::Shares),
-                        "saved" => Some(InsightMetric::Saved),
-                        "video_views" => Some(InsightMetric::VideoViews),
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>()
-            });
-        let insights = client
-            .get_media_insights(media_id.clone(), metrics)
-            .await
-            .unwrap();
-        tool_text_response!(serde_json::json!({ "media_id": media_id, "insights": insights }))
-    })
-}
-
-fn publish_media_handler(
-    request: CallToolRequest,
-) -> std::pin::Pin<Box<dyn std::future::Future<Output = CallToolResponse> + Send + 'static>> {
-    Box::pin(async move {
-        let client = INSTAGRAM_CLIENT
-            .get()
-            .expect("SSE client must be initialized before tool handlers run");
-        let request: PublishMediaRequest =
-            serde_json::from_value(serde_json::json!(request.arguments.unwrap()))
-                .unwrap();
-        let response = client.publish_media(request).await.unwrap();
-        tool_text_response!(serde_json::json!(response))
-    })
-}
-
-fn get_account_pages_handler(
-    _: CallToolRequest,
-) -> std::pin::Pin<Box<dyn std::future::Future<Output = CallToolResponse> + Send + 'static>> {
-    Box::pin(async move {
-        let client = INSTAGRAM_CLIENT
-            .get()
-            .expect("SSE client must be initialized before tool handlers run");
-        let pages = client.get_account_pages().await.unwrap();
-        tool_text_response!(serde_json::json!({ "pages": pages, "count": pages.len() }))
-    })
-}
-
-fn get_account_insights_handler(
-    request: CallToolRequest,
-) -> std::pin::Pin<Box<dyn std::future::Future<Output = CallToolResponse> + Send + 'static>> {
-    let client = INSTAGRAM_CLIENT
-        .get()
-        .expect("SSE client must be initialized before tool handlers run");
-    let client = Arc::clone(&client);
-    Box::pin(async move {
-        let account_id = request
-            .arguments
-            .as_ref()
-            .unwrap()
-            .get("account_id")
-            .and_then(Value::as_str)
-            .map(str::to_string);
-        let metrics = request
-            .arguments
-            .as_ref()
-            .unwrap()
-            .get("metrics")
-            .and_then(Value::as_array)
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(Value::as_str)
-                    .map(str::to_string)
-                    .collect::<Vec<_>>()
-            });
-        let period = match request
-            .arguments
-            .as_ref()
-            .unwrap()
-            .get("period")
-            .and_then(Value::as_str)
-            .unwrap_or("day")
-        {
-            "lifetime" => InsightPeriod::Lifetime,
-            _ => InsightPeriod::Day,
-        };
-        let insights: Vec<AccountInsight> = client
-            .get_account_insights(account_id, metrics, period)
-            .await
-            .unwrap();
-        tool_text_response!(serde_json::json!({ "insights": insights }))
-    })
-}
-
-fn validate_access_token_handler(
-    _: CallToolRequest,
-) -> std::pin::Pin<Box<dyn std::future::Future<Output = CallToolResponse> + Send + 'static>> {
-    Box::pin(async move {
-        let client = INSTAGRAM_CLIENT
-            .get()
-            .expect("SSE client must be initialized before tool handlers run");
-        let valid: bool = client.validate_access_token().await;
-        tool_text_response!(serde_json::json!({ "valid": valid }))
-    })
-}
-
-fn get_conversations_handler(
-    request: CallToolRequest,
-) -> std::pin::Pin<Box<dyn std::future::Future<Output = CallToolResponse> + Send + 'static>> {
-    Box::pin(async move {
-        let client = INSTAGRAM_CLIENT
-            .get()
-            .expect("SSE client must be initialized before tool handlers run");
-        let page_id = request
-            .arguments
-            .as_ref()
-            .unwrap()
-            .get("page_id")
-            .and_then(Value::as_str)
-            .map(str::to_string);
-        let limit = request
-            .arguments
-            .as_ref()
-            .unwrap()
-            .get("limit")
-            .and_then(Value::as_u64)
-            .unwrap_or(25) as u32;
-        let conversations = client.get_conversations(page_id, limit).await.unwrap();
-        tool_text_response!(serde_json::json!({
-            "conversations": conversations,
-            "count": conversations.len()
-        }))
-    })
-}
-
-fn get_conversation_messages_handler(
-    request: CallToolRequest,
-) -> std::pin::Pin<Box<dyn std::future::Future<Output = CallToolResponse> + Send + 'static>> {
-    Box::pin(async move {
-        let client = INSTAGRAM_CLIENT
-            .get()
-            .expect("SSE client must be initialized before tool handlers run");
-
-        let conversation_id: String = request
-            .arguments
-            .as_ref()
-            .unwrap()
-            .get("conversation_id")
-            .and_then(Value::as_str)
-            .ok_or_else(|| AppError::Validation("conversation_id is required".to_string()))
-            .unwrap()
-            .to_string();
-        let limit = request
-            .arguments
-            .as_ref()
-            .unwrap()
-            .get("limit")
-            .and_then(Value::as_u64)
-            .unwrap_or(25) as u32;
-        let messages = client
-            .get_conversation_messages(conversation_id.clone(), limit)
-            .await
-            .unwrap();
-        tool_text_response!(serde_json::json!({
-            "conversation_id": conversation_id,
-            "messages": messages,
-            "count": messages.len()
-        }))
-    })
-}
-
-fn send_dm_handler(
-    request: CallToolRequest,
-) -> std::pin::Pin<Box<dyn std::future::Future<Output = CallToolResponse> + Send + 'static>> {
-    Box::pin(async move {
-        let client = INSTAGRAM_CLIENT
-            .get()
-            .expect("SSE client must be initialized before tool handlers run");
-        let request: SendDmRequest =
-            serde_json::from_value(serde_json::json!(request.arguments.unwrap()))
-                .unwrap();
-        let response: SendDmResponse = client.send_dm(request).await.unwrap();
-        tool_text_response!(serde_json::json!(response))
-    })
-}
-
-pub async fn mcp_server_run_sse(settings: Arc<Settings>, client: Arc<InstagramClient>) {
+pub async fn mcp_server_run_sse(client: Arc<InstagramClient>) {
     let _ = INSTAGRAM_CLIENT.set(Arc::clone(&client));
 
-    let server_protocol = Server::builder(
-        settings.mcp_server_name.clone(),
-        settings.mcp_server_version.clone(),
-        mcp_core::types::ProtocolVersion::V2025_03_26,
-    )
-    .set_capabilities(ServerCapabilities {
-        tools: Some(ToolCapabilities::default()),
-        ..Default::default()
-    })
-    .register_tool(get_profile_info(), get_profile_info_handler)
-    .register_tool(get_media_posts(), get_media_posts_handler)
-    .register_tool(get_media_insights(), get_media_insights_handler)
-    .register_tool(publish_media(), publish_media_handler)
-    .register_tool(get_account_pages(), get_account_pages_handler)
-    .register_tool(get_account_insights(), get_account_insights_handler)
-    .register_tool(validate_access_token(), validate_access_token_handler)
-    .register_tool(get_conversations(), get_conversations_handler)
-    .register_tool(
-        get_conversation_messages(),
-        get_conversation_messages_handler,
-    )
-    .register_tool(send_dm(), send_dm_handler)
-    .build();
-    let transport = ServerSseTransport::new("127.0.0.1".to_string(), 9091, server_protocol);
+    let service = StreamableHttpService::new(
+        || Ok(InstagramMcpServerSse::new()),
+        LocalSessionManager::default().into(),
+        StreamableHttpServerConfig::default(),
+    );
 
-    let _ = Server::start(transport).await;
+    let router = axum::Router::new().nest_service("/sse", service);
+    let tcp_listener = tokio::net::TcpListener::bind("127.0.0.1:9091")
+        .await
+        .unwrap();
+    let _ = axum::serve(tcp_listener, router)
+        .with_graceful_shutdown(async move {
+            tokio::signal::ctrl_c().await.unwrap();
+        })
+        .await
+        .unwrap();
 }

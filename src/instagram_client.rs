@@ -167,7 +167,7 @@ impl InstagramClient {
 
         self.limiter.until_ready().await;
 
-        let base_url = if use_facebook_api {
+        let base_url: String = if use_facebook_api {
             "https://graph.facebook.com/v22.0".to_string()
         } else {
             self.settings.instagram_api_url()
