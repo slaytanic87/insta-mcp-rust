@@ -1,16 +1,10 @@
 use std::sync::{Arc, OnceLock};
 
 use rmcp::{
-    ErrorData as McpError, RoleServer, ServerHandler,
-    handler::server::{router::prompt::PromptRouter, tool::ToolRouter, wrapper::Parameters},
-    model::{CallToolResult, Content, InitializeRequestParams, InitializeResult, Meta},
-    prompt, prompt_handler, schemars, prompt_router,
-    service::RequestContext,
-    task_handler, tool, tool_handler, tool_router,
-    transport::{
+    ErrorData as McpError, RoleServer, ServerHandler, handler::server::{router::prompt::PromptRouter, tool::ToolRouter, wrapper::Parameters}, model::{CallToolResult, Content, GetPromptResult, InitializeRequestParams, InitializeResult, Meta, PromptMessage, PromptMessageRole}, prompt, prompt_handler, prompt_router, schemars, service::RequestContext, task_handler, tool, tool_handler, tool_router, transport::{
         StreamableHttpServerConfig, StreamableHttpService,
         streamable_http_server::session::local::LocalSessionManager,
-    },
+    }
 };
 
 use serde::Deserialize;
@@ -116,6 +110,14 @@ struct SendDm {
         description = "Message content to send in the DM (maximum length: 1000 characters)"
     )]
     message: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct AnalyzeEngagementPrompt {
+    #[schemars(description = "Instagram media ID to analyze")]
+    media_id: String,
+    #[schemars(description = "Period to compare against (e.g., last_week, last_month)")]
+    comparison_period: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -372,6 +374,31 @@ impl InstagramMcpServerSse {
 #[prompt_router]
 impl InstagramMcpServerSse {
 
+    #[prompt(name = "analyze_engagement",
+             description = "Analyze Instagram post engagement and provide insights")]
+    async fn analyze_engagement(
+        &self,
+        Parameters(AnalyzeEngagementPrompt {
+            media_id,
+            comparison_period,
+        }): Parameters<AnalyzeEngagementPrompt>,
+        _context: RequestContext<RoleServer>,
+    ) -> Result<Vec<PromptMessage>, McpError> {
+            let client = INSTAGRAM_CLIENT
+            .get()
+            .expect("SSE client must be initialized before tool handlers run");
+
+            let insights = 
+                    client
+                    .get_media_insights(media_id.to_string(), None)
+                    .await.unwrap();
+            let prompt = format!(
+                "Analyze the engagement metrics for Instagram post {}:\n\nInsights Data:\n{}\n\nPlease provide:\n1. Overall engagement performance assessment\n2. Key metrics analysis (impressions, reach, likes, comments, shares)\n3. Engagement rate calculation and interpretation\n4. Recommendations for improving future posts\n5. Comparison with typical performance benchmarks",
+                media_id,
+                serde_json::to_string_pretty(&insights).unwrap_or_else(|_| "[]".to_string())
+            );
+            Ok(vec![PromptMessage::new_text(PromptMessageRole::User, prompt)])
+    }
 }
 
 #[tool_handler(meta = Meta(rmcp::object!({"tool_meta_key": "tool_meta_value"})))]
