@@ -51,7 +51,7 @@ async fn main() {
 
     if !args.is_empty() && args[1] == "sse" {
         info!(args = ?args, "Command-line arguments provided, starting server with arguments");
-        mcp_server_run_sse(client).await;
+        mcp_server_run_sse(client).await.unwrap();
     } else {
         info!("No command-line arguments provided, starting server in normal mode");
         let server = InstagramMcpServer::new(settings, client);

@@ -2,9 +2,9 @@ use std::sync::{Arc, OnceLock};
 
 use rmcp::{
     ErrorData as McpError, RoleServer, ServerHandler,
-    handler::server::{tool::ToolRouter, wrapper::Parameters},
+    handler::server::{router::prompt::PromptRouter, tool::ToolRouter, wrapper::Parameters},
     model::{CallToolResult, Content, InitializeRequestParams, InitializeResult, Meta},
-    prompt, prompt_handler, schemars,
+    prompt, prompt_handler, schemars, prompt_router,
     service::RequestContext,
     task_handler, tool, tool_handler, tool_router,
     transport::{
@@ -15,10 +15,9 @@ use rmcp::{
 
 use serde::Deserialize;
 use serde_json::Value;
+use url::Url;
 
 use crate::{
-    config::Settings,
-    error::AppError,
     instagram_client::InstagramClient,
     models::{
         AccountInsight, InsightMetric, InsightPeriod, InstagramMedia, InstagramProfile,
@@ -27,162 +26,6 @@ use crate::{
 };
 
 static INSTAGRAM_CLIENT: OnceLock<Arc<InstagramClient>> = OnceLock::new();
-/*
-fn get_profile_info() -> Tool {
-    Tool {
-            name: "get_profile_info".to_string(),
-            description: Some("Get Instagram business profile information including followers, bio, and account details".to_string()),
-            input_schema: serde_json::json!({
-                        "type": "object",
-                        "properties": {
-                            "account_id": { "type": "string", "description": "Instagram business account ID (optional)" }
-                        }
-            }),
-            annotations: None
-        }
-}
-
-fn get_media_posts() -> Tool {
-    Tool {
-        name: "get_media_posts".to_string(),
-        description: Some(
-            "Get recent media posts from Instagram account with engagement metrics".to_string(),
-        ),
-        input_schema: serde_json::json!({
-            "type": "object",
-            "properties": {
-                "account_id": { "type": "string" },
-                "limit": { "type": "integer", "minimum": 1, "maximum": 100, "default": 25 },
-                "after": { "type": "string" }
-            }
-        }),
-        annotations: None,
-    }
-}
-
-fn get_media_insights() -> Tool {
-    Tool {
-        name: "get_media_insights".to_string(),
-        description: Some(
-            "Get detailed insights and analytics for a specific Instagram post".to_string(),
-        ),
-        input_schema: serde_json::json!({
-            "type": "object",
-            "properties": {
-                "media_id": { "type": "string" },
-                "metrics": {
-                    "type": "array",
-                    "items": { "type": "string", "enum": ["reach", "likes", "comments", "shares", "saved", "video_views"] }
-                }
-            },
-            "required": ["media_id"]
-        }),
-        annotations: None,
-    }
-}
-
-fn publish_media() -> Tool {
-    Tool {
-        name: "publish_media".to_string(),
-        description: Some("Upload and publish an image or video to Instagram".to_string()),
-        input_schema: serde_json::json!({
-            "type": "object",
-            "properties": {
-                "image_url": { "type": "string", "format": "uri" },
-                "video_url": { "type": "string", "format": "uri" },
-                "caption": { "type": "string" },
-                "location_id": { "type": "string" }
-            },
-            "anyOf": [{"required": ["image_url"]}, {"required": ["video_url"]}]
-        }),
-        annotations: None,
-    }
-}
-
-fn get_account_pages() -> Tool {
-    Tool {
-        name: "get_account_pages".to_string(),
-        description: Some("Get Facebook pages connected to the account".to_string()),
-        input_schema: serde_json::json!({"type": "object", "properties": {}}),
-        annotations: None,
-    }
-}
-
-fn get_account_insights() -> Tool {
-    Tool {
-        name: "get_account_insights".to_string(),
-        description: Some("Get account-level insights and analytics".to_string()),
-        input_schema: serde_json::json!({
-            "type": "object",
-            "properties": {
-                "account_id": { "type": "string" },
-                "metrics": { "type": "array", "items": { "type": "string" } },
-                "period": { "type": "string", "enum": ["day", "lifetime"], "default": "day" }
-            }
-        }),
-        annotations: None,
-    }
-}
-
-fn validate_access_token() -> Tool {
-    Tool {
-        name: "validate_access_token".to_string(),
-        description: Some("Validate the Instagram API access token".to_string()),
-        input_schema: serde_json::json!({"type": "object", "properties": {}}),
-        annotations: None,
-    }
-}
-
-fn get_conversations() -> Tool {
-    Tool {
-        name: "get_conversations".to_string(),
-        description: Some(
-            "Get Instagram DM conversations (requires instagram_manage_messages Advanced Access)"
-                .to_string(),
-        ),
-        input_schema: serde_json::json!({
-            "type": "object",
-            "properties": {
-                "page_id": { "type": "string" },
-                "limit": { "type": "integer", "minimum": 1, "maximum": 100, "default": 25 }
-            }
-        }),
-        annotations: None,
-    }
-}
-
-fn get_conversation_messages() -> Tool {
-    Tool {
-        name: "get_conversation_messages".to_string(),
-        description: Some("Get messages for a specific conversation".to_string()),
-        input_schema: serde_json::json!({
-            "type": "object",
-            "properties": {
-                "conversation_id": { "type": "string" },
-                "limit": { "type": "integer", "minimum": 1, "maximum": 100, "default": 25 }
-            },
-            "required": ["conversation_id"]
-        }),
-        annotations: None,
-    }
-}
-
-fn send_dm() -> Tool {
-    Tool {
-        name: "send_dm".to_string(),
-        description: Some("Send Instagram direct message (requires Advanced Access)".to_string()),
-        input_schema: serde_json::json!({
-            "type": "object",
-            "properties": {
-                "recipient_id": { "type": "string" },
-                "message": { "type": "string", "maxLength": 1000 }
-            },
-            "required": ["recipient_id", "message"]
-        }),
-        annotations: None,
-    }
-}
-*/
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 struct GetProfileInfo {
@@ -216,11 +59,11 @@ struct PublishMedia {
     #[schemars(
         description = "URL of the image to publish (required if video_url is not provided)"
     )]
-    image_url: Option<String>,
+    image_url: Option<Value>,
     #[schemars(
         description = "URL of the video to publish (required if image_url is not provided)"
     )]
-    video_url: Option<String>,
+    video_url: Option<Value>,
     #[schemars(description = "Caption for the media post")]
     caption: Option<String>,
     #[schemars(description = "Location ID to tag in the media post")]
@@ -278,13 +121,16 @@ struct SendDm {
 #[derive(Debug, Clone)]
 struct InstagramMcpServerSse {
     tool_router: ToolRouter<InstagramMcpServerSse>,
+    prompt_router: PromptRouter<InstagramMcpServerSse>,
 }
 
 #[tool_router]
 impl InstagramMcpServerSse {
+
     pub fn new() -> Self {
         Self {
             tool_router: Self::tool_router(),
+            prompt_router: Self::prompt_router(),
         }
     }
 
@@ -294,12 +140,216 @@ impl InstagramMcpServerSse {
     async fn get_profile_info(
         &self,
         Parameters(GetProfileInfo { account_id }): Parameters<GetProfileInfo>,
-    ) -> String {
+    ) -> Result<CallToolResult, McpError> {
         let client = INSTAGRAM_CLIENT
             .get()
             .expect("SSE client must be initialized before tool handlers run");
-        let profile_info = client.get_profile_info(account_id).await.unwrap();
-        serde_json::json!(profile_info).to_string()
+        let profile_info: InstagramProfile = client.get_profile_info(account_id).await.unwrap();
+        Ok(CallToolResult::structured(serde_json::json!(profile_info)))
+    }
+
+    #[tool(description = "Get recent media posts from Instagram account with engagement metrics")]
+    async fn get_media_posts(
+        &self,
+        Parameters(GetMediaPosts {
+            account_id,
+            limit,
+            after,
+        }): Parameters<GetMediaPosts>,
+    ) -> Result<CallToolResult, McpError> {
+        let client = INSTAGRAM_CLIENT
+            .get()
+            .expect("SSE client must be initialized before tool handlers run");
+        let media_posts: Vec<InstagramMedia> = client
+            .get_media_posts(account_id, limit.unwrap_or(25), after)
+            .await
+            .unwrap();
+        Ok(CallToolResult::structured(serde_json::json!(media_posts)))
+    }
+
+    #[tool(description = "Get detailed insights and analytics for a specific Instagram post")]
+    async fn get_media_insights(
+        &self,
+        Parameters(GetMediaInsights { media_id, metrics }): Parameters<GetMediaInsights>,
+    ) -> Result<CallToolResult, McpError> {
+        let client = INSTAGRAM_CLIENT
+            .get()
+            .expect("SSE client must be initialized before tool handlers run");
+
+        let mapped_metrics: Option<Vec<InsightMetric>> = metrics.map(|m| {
+            m.into_iter()
+                .filter_map(|metric_str| match metric_str.as_str() {
+                    "reach" => Some(InsightMetric::Reach),
+                    "impressions" => Some(InsightMetric::Impressions),
+                    "likes" => Some(InsightMetric::Likes),
+                    "comments" => Some(InsightMetric::Comments),
+                    "shares" => Some(InsightMetric::Shares),
+                    "saved" => Some(InsightMetric::Saved),
+                    "video_views" => Some(InsightMetric::VideoViews),
+                    _ => None,
+                })
+                .collect()
+        });
+
+        let insights = client
+            .get_media_insights(media_id, mapped_metrics)
+            .await
+            .unwrap();
+        Ok(CallToolResult::structured(serde_json::json!(insights)))
+    }
+
+    #[tool(description = "Upload and publish an image or video to Instagram")]
+    async fn publish_media(
+        &self,
+        Parameters(PublishMedia {
+            image_url,
+            video_url,
+            caption,
+            location_id,
+        }): Parameters<PublishMedia>,
+    ) -> Result<CallToolResult, McpError> {
+        let client = INSTAGRAM_CLIENT
+            .get()
+            .expect("SSE client must be initialized before tool handlers run");
+        let image_url_obj: Option<Url> = if let Some(url) = image_url {
+            serde_json::from_value(url).unwrap()
+        } else {
+            None
+        };
+        let video_url_obj: Option<Url> = if let Some(url) = video_url {
+            serde_json::from_value(url).unwrap()
+        } else {
+            None
+        };
+
+        let request = PublishMediaRequest {
+            image_url: image_url_obj,
+            video_url: video_url_obj,
+            caption,
+            location_id,
+            user_tags: None,
+        };
+        let publish_result = client.publish_media(request).await.unwrap();
+        Ok(CallToolResult::structured(serde_json::json!(
+            publish_result
+        )))
+    }
+
+    #[tool(description = "Get Facebook pages connected to the account")]
+    async fn get_account_pages(
+        &self,
+        Parameters(GetAccountPages {}): Parameters<GetAccountPages>,
+    ) -> Result<CallToolResult, McpError> {
+        let client = INSTAGRAM_CLIENT
+            .get()
+            .expect("SSE client must be initialized before tool handlers run");
+        let pages = client.get_account_pages().await.unwrap();
+        Ok(CallToolResult::structured(serde_json::json!(pages)))
+    }
+
+    #[tool(description = "Get account-level insights and analytics")]
+    async fn get_account_insights(
+        &self,
+        Parameters(GetAccountInsights {
+            account_id,
+            metrics,
+            period,
+        }): Parameters<GetAccountInsights>,
+    ) -> Result<CallToolResult, McpError> {
+        let client = INSTAGRAM_CLIENT
+            .get()
+            .expect("SSE client must be initialized before tool handlers run");
+        let period_enum = if let Some(period_str) = period {
+            match period_str.as_str() {
+                "lifetime" => InsightPeriod::Lifetime,
+                _ => InsightPeriod::Day,
+            }
+        } else {
+            InsightPeriod::Day
+        };
+        let insights: Vec<AccountInsight> = client
+            .get_account_insights(account_id, metrics, period_enum)
+            .await
+            .unwrap();
+        Ok(CallToolResult::structured(
+            serde_json::json!({ "insights": insights }),
+        ))
+    }
+
+    #[tool(description = "Validate the Instagram API access token")]
+    async fn validate_access_token(
+        &self,
+        Parameters(ValidateAccessToken {}): Parameters<ValidateAccessToken>,
+    ) -> Result<CallToolResult, McpError> {
+        let client = INSTAGRAM_CLIENT
+            .get()
+            .expect("SSE client must be initialized before tool handlers run");
+        let valid: bool = client.validate_access_token().await;
+        Ok(CallToolResult::structured(
+            serde_json::json!({ "valid": valid }),
+        ))
+    }
+
+    #[tool(
+        description = "Get Instagram DM conversations (requires instagram_manage_messages Advanced Access)"
+    )]
+    async fn get_conversations(
+        &self,
+        Parameters(GetConversations { page_id, limit }): Parameters<GetConversations>,
+    ) -> Result<CallToolResult, McpError> {
+        let client = INSTAGRAM_CLIENT
+            .get()
+            .expect("SSE client must be initialized before tool handlers run");
+        let conversations = client
+            .get_conversations(page_id, limit.unwrap_or(25))
+            .await
+            .unwrap();
+        Ok(CallToolResult::structured(serde_json::json!({
+            "conversations": conversations,
+            "count": conversations.len()
+        })))
+    }
+
+    #[tool(description = "Get messages for a specific conversation")]
+    async fn get_conversation_messages(
+        &self,
+        Parameters(GetConversationMessages {
+            conversation_id,
+            limit,
+        }): Parameters<GetConversationMessages>,
+    ) -> Result<CallToolResult, McpError> {
+        let client = INSTAGRAM_CLIENT
+            .get()
+            .expect("SSE client must be initialized before tool handlers run");
+        let messages = client
+            .get_conversation_messages(conversation_id.clone(), limit.unwrap_or(25))
+            .await
+            .unwrap();
+        Ok(CallToolResult::structured(serde_json::json!({
+            "conversation_id": conversation_id,
+            "messages": messages,
+            "count": messages.len()
+        })))
+    }
+
+    #[tool(description = "Send Instagram direct message (requires Advanced Access)")]
+    async fn send_dm(
+        &self,
+        Parameters(SendDm {
+            recipient_id,
+            message,
+        }): Parameters<SendDm>,
+    ) -> Result<CallToolResult, McpError> {
+        let client = INSTAGRAM_CLIENT
+            .get()
+            .expect("SSE client must be initialized before tool handlers run");
+        let request = SendDmRequest {
+            recipient_id,
+            message,
+            message_type: None,
+        };
+        let response: SendDmResponse = client.send_dm(request).await.unwrap();
+        Ok(CallToolResult::structured(serde_json::json!(response)))
     }
 
     /// Returns the `Mcp-Session-Id` of the current session (streamable HTTP only).
@@ -319,6 +369,11 @@ impl InstagramMcpServerSse {
     }
 }
 
+#[prompt_router]
+impl InstagramMcpServerSse {
+
+}
+
 #[tool_handler(meta = Meta(rmcp::object!({"tool_meta_key": "tool_meta_value"})))]
 impl ServerHandler for InstagramMcpServerSse {
     async fn initialize(
@@ -335,7 +390,7 @@ impl ServerHandler for InstagramMcpServerSse {
     }
 }
 
-pub async fn mcp_server_run_sse(client: Arc<InstagramClient>) {
+pub async fn mcp_server_run_sse(client: Arc<InstagramClient>) -> Result<(), std::io::Error> {
     let _ = INSTAGRAM_CLIENT.set(Arc::clone(&client));
 
     let service = StreamableHttpService::new(
@@ -346,12 +401,11 @@ pub async fn mcp_server_run_sse(client: Arc<InstagramClient>) {
 
     let router = axum::Router::new().nest_service("/sse", service);
     let tcp_listener = tokio::net::TcpListener::bind("127.0.0.1:9091")
-        .await
-        .unwrap();
+        .await?;
     let _ = axum::serve(tcp_listener, router)
         .with_graceful_shutdown(async move {
             tokio::signal::ctrl_c().await.unwrap();
         })
-        .await
-        .unwrap();
+        .await?;
+    Ok(())
 }
