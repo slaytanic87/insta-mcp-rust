@@ -17,7 +17,6 @@ use crate::mcp_server_sse::mcp_server_run_sse;
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
-    let args: Vec<String> = std::env::args().collect();
 
     let settings = match Settings::from_env() {
         Ok(s) => Arc::new(s),
@@ -32,10 +31,11 @@ async fn main() {
     info!(
         server_name = %settings.mcp_server_name,
         server_version = %settings.mcp_server_version,
+        mcp_transport = %settings.mcp_transport,
         "Starting Instagram MCP server"
     );
 
-    let client = match InstagramClient::new(settings.clone()) {
+    let client: Arc<InstagramClient> = match InstagramClient::new(settings.clone()) {
         Ok(c) => Arc::new(c),
         Err(e) => {
             error!(error = %e, "Failed to initialize Instagram client");
@@ -49,16 +49,16 @@ async fn main() {
         info!("Instagram access token validated successfully");
     }
 
-    if !args.is_empty() && args[1] == "sse" {
-        info!(args = ?args, "Command-line arguments provided, starting server with arguments");
+    if settings.mcp_transport.to_lowercase() == "sse" {
         mcp_server_run_sse(client).await.unwrap();
-    } else {
-        info!("No command-line arguments provided, starting server in normal mode");
+    } else if settings.mcp_transport.to_lowercase() == "stdio" {
         let server = InstagramMcpServer::new(settings, client);
         if let Err(e) = server.run_stdio().await {
             error!(error = %e, "Server exited with error");
         }
         std::process::exit(1);
+    } else {
+        error!("Only stdio or sse MCP_TRANSPORT values are supported, received: {} as value", settings.mcp_transport);
     }
 }
 
