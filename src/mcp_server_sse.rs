@@ -145,6 +145,7 @@ struct InstagramMcpServerSse {
 
 #[tool_router]
 impl InstagramMcpServerSse {
+
     pub fn new() -> Self {
         Self {
             tool_router: Self::tool_router(),
@@ -398,7 +399,7 @@ impl InstagramMcpServerSse {
         &self,
         Parameters(AnalyzeEngagementPrompt {
             media_id,
-            comparison_period,
+            ..
         }): Parameters<AnalyzeEngagementPrompt>,
         _context: RequestContext<RoleServer>,
     ) -> Result<Vec<PromptMessage>, McpError> {
