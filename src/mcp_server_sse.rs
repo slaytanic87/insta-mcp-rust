@@ -1,7 +1,9 @@
-use std::sync::{Arc, OnceLock};
+use std::{sync::{Arc, Mutex, OnceLock}};
 
 use rmcp::{
-    ErrorData as McpError, RoleServer, ServerHandler, handler::server::{router::prompt::PromptRouter, tool::ToolRouter, wrapper::Parameters}, model::{CallToolResult, Content, GetPromptResult, InitializeRequestParams, InitializeResult, Meta, PromptMessage, PromptMessageRole}, prompt, prompt_handler, prompt_router, schemars, service::RequestContext, task_handler, tool, tool_handler, tool_router, transport::{
+    ErrorData as McpError, RoleServer, ServerHandler, handler::server::{router::prompt::PromptRouter, tool::ToolRouter, wrapper::Parameters}, model::{
+        AnnotateAble, CallToolResult, Content, Implementation, InitializeRequestParams, InitializeResult, ListResourceTemplatesResult, ListResourcesResult, Meta, PaginatedRequestParams, PromptMessage, PromptMessageRole, ProtocolVersion, RawResource, ReadResourceRequestParams, ReadResourceResult, ResourceContents, ServerCapabilities, ServerInfo
+    }, prompt, prompt_router, schemars, service::RequestContext, task_manager::{OperationProcessor}, tool, tool_handler, tool_router, transport::{
         StreamableHttpServerConfig, StreamableHttpService,
         streamable_http_server::session::local::LocalSessionManager,
     }
@@ -120,19 +122,34 @@ struct AnalyzeEngagementPrompt {
     comparison_period: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct ContentStrategyPrompt {
+    #[schemars(description = "Area to focus on (e.g., engagement, reach, growth)")]
+    focus_area: Option<String>,
+    #[schemars(description = "Time period to analyze (e.g., week, month)")]
+    time_period: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct HashtagAnalysisPrompt {
+    #[schemars(description = "Number of recent posts to analyze")]
+    post_count: Option<u32>,
+}
+
+#[derive(Clone)]
 struct InstagramMcpServerSse {
     tool_router: ToolRouter<InstagramMcpServerSse>,
     prompt_router: PromptRouter<InstagramMcpServerSse>,
+    processor: Arc<Mutex<OperationProcessor>>
 }
 
 #[tool_router]
 impl InstagramMcpServerSse {
-
     pub fn new() -> Self {
         Self {
             tool_router: Self::tool_router(),
             prompt_router: Self::prompt_router(),
+            processor: Arc::new(Mutex::new(OperationProcessor::new())),
         }
     }
 
@@ -373,9 +390,10 @@ impl InstagramMcpServerSse {
 
 #[prompt_router]
 impl InstagramMcpServerSse {
-
-    #[prompt(name = "analyze_engagement",
-             description = "Analyze Instagram post engagement and provide insights")]
+    #[prompt(
+        name = "analyze_engagement",
+        description = "Analyze Instagram post engagement and provide insights"
+    )]
     async fn analyze_engagement(
         &self,
         Parameters(AnalyzeEngagementPrompt {
@@ -384,20 +402,110 @@ impl InstagramMcpServerSse {
         }): Parameters<AnalyzeEngagementPrompt>,
         _context: RequestContext<RoleServer>,
     ) -> Result<Vec<PromptMessage>, McpError> {
-            let client = INSTAGRAM_CLIENT
+        let client = INSTAGRAM_CLIENT
             .get()
             .expect("SSE client must be initialized before tool handlers run");
 
-            let insights = 
-                    client
-                    .get_media_insights(media_id.to_string(), None)
-                    .await.unwrap();
-            let prompt = format!(
-                "Analyze the engagement metrics for Instagram post {}:\n\nInsights Data:\n{}\n\nPlease provide:\n1. Overall engagement performance assessment\n2. Key metrics analysis (impressions, reach, likes, comments, shares)\n3. Engagement rate calculation and interpretation\n4. Recommendations for improving future posts\n5. Comparison with typical performance benchmarks",
-                media_id,
-                serde_json::to_string_pretty(&insights).unwrap_or_else(|_| "[]".to_string())
-            );
-            Ok(vec![PromptMessage::new_text(PromptMessageRole::User, prompt)])
+        let insights = client
+            .get_media_insights(media_id.to_string(), None)
+            .await
+            .unwrap();
+        let prompt = format!(
+            "Analyze the engagement metrics for Instagram post {}:\n\nInsights Data:\n{}\n\nPlease provide:\n1. Overall engagement performance assessment\n2. Key metrics analysis (impressions, reach, likes, comments, shares)\n3. Engagement rate calculation and interpretation\n4. Recommendations for improving future posts\n5. Comparison with typical performance benchmarks",
+            media_id,
+            serde_json::to_string_pretty(&insights).unwrap_or_else(|_| "[]".to_string())
+        );
+        Ok(vec![PromptMessage::new_text(
+            PromptMessageRole::User,
+            prompt,
+        )])
+    }
+
+    #[prompt(
+        name = "content_strategy",
+        description = "Generate content strategy recommendations based on account performance"
+    )]
+    async fn content_strategy(
+        &self,
+        Parameters(ContentStrategyPrompt {
+            focus_area,
+            time_period,
+        }): Parameters<ContentStrategyPrompt>,
+        _context: RequestContext<RoleServer>,
+    ) -> Result<Vec<PromptMessage>, McpError> {
+        let client = INSTAGRAM_CLIENT
+            .get()
+            .expect("SSE client must be initialized before tool handlers run");
+        let posts = client.get_media_posts(None, 20, None).await.unwrap();
+        let account_insights = client
+            .get_account_insights(None, None, InsightPeriod::Day)
+            .await
+            .unwrap();
+        let preview_posts = posts.into_iter().take(5).collect::<Vec<_>>();
+        let focus_area_str = focus_area.clone().unwrap_or("engagement".to_string());
+        let time_period_str = time_period.clone().unwrap_or("week".to_string());
+
+        let prompt = format!(
+            "Generate a content strategy for Instagram focusing on {} over the {}:\n\nRecent Posts Performance:\n{}\n\nAccount Insights:\n{}\n\nPlease provide:\n1. Content performance analysis\n2. Optimal posting times and frequency\n3. Content type recommendations (images, videos, carousels)\n4. Caption and hashtag strategies\n5. Engagement tactics to improve {}\n6. Specific action items for the next {}",
+            focus_area_str,
+            time_period_str,
+            serde_json::to_string_pretty(&preview_posts).unwrap_or_else(|_| "[]".to_string()),
+            serde_json::to_string_pretty(&account_insights).unwrap_or_else(|_| "[]".to_string()),
+            focus_area_str,
+            time_period_str,
+        );
+
+        Ok(vec![PromptMessage::new_text(
+            PromptMessageRole::User,
+            prompt,
+        )])
+    }
+
+    #[prompt(
+        name = "hashtag_analysis",
+        description = "Analyze hashtag performance and suggest improvements"
+    )]
+    async fn hashtag_analysis(
+        &self,
+        Parameters(HashtagAnalysisPrompt { post_count }): Parameters<HashtagAnalysisPrompt>,
+        _context: RequestContext<RoleServer>,
+    ) -> Result<Vec<PromptMessage>, McpError> {
+        let client = INSTAGRAM_CLIENT
+            .get()
+            .expect("SSE client must be initialized before tool handlers run");
+        let post_count_value: u32 = post_count.unwrap_or(10);
+
+        let posts: Vec<InstagramMedia> = client
+            .get_media_posts(None, post_count_value, None)
+            .await
+            .unwrap();
+        let hashtags_data: Vec<Value> = posts
+            .into_iter()
+            .filter_map(|post| {
+                let caption = post.caption?;
+                let hashtags = caption
+                    .split_whitespace()
+                    .filter(|word| word.starts_with('#'))
+                    .map(str::to_string)
+                    .collect::<Vec<_>>();
+                Some(serde_json::json!({
+                    "post_id": post.id,
+                    "hashtags": hashtags,
+                    "likes": post.like_count,
+                    "comments": post.comments_count,
+                }))
+            })
+            .collect::<Vec<_>>();
+        let prompt = format!(
+            "Analyze hashtag performance for the last {} Instagram posts:\n\nHashtag Data:\n{}\n\nPlease provide:\n1. Most frequently used hashtags\n2. Hashtag performance correlation with engagement\n3. Hashtag diversity analysis\n4. Recommendations for hashtag optimization\n5. Suggested new hashtags to try\n6. Hashtag strategy improvements",
+            post_count_value,
+            serde_json::to_string_pretty(&hashtags_data).unwrap_or_else(|_| "[]".to_string())
+        );
+
+        Ok(vec![PromptMessage::new_text(
+            PromptMessageRole::User,
+            prompt,
+        )])
     }
 }
 
@@ -415,6 +523,103 @@ impl ServerHandler for InstagramMcpServerSse {
         }
         Ok(self.get_info())
     }
+
+    fn get_info(&self) -> ServerInfo {
+        ServerInfo::new(
+            ServerCapabilities::builder()
+            .enable_prompts()
+            .enable_resources()
+            .enable_tools()
+            .build()
+        )
+        .with_server_info(Implementation::from_build_env())
+        .with_protocol_version(ProtocolVersion::V_2024_11_05)
+        .with_instructions(r#"This server provides tools and prompts to interact with instagram.
+         Tools: get_profile_info, get_media_posts, get_media_insights, publish_media, get_account_pages, get_account_insights, validate_access_token, get_conversations, get_conversation_messages, send_dm
+         Prompts: analyze_engagement, content_strategy, hashtag_analysis
+         "#.to_string())
+    }
+
+    async fn list_resources(&self, _request: Option<PaginatedRequestParams>, _context: RequestContext<RoleServer>) -> Result<ListResourcesResult, McpError> {
+        Ok(
+            ListResourcesResult { 
+                meta: None,
+                next_cursor: None,
+                resources: vec![
+                    RawResource::new("instagram://profile", "Instagram Profile")
+                    .with_description("Current Instagram business profile information")
+                    .with_mime_type("application/json")
+                    .no_annotation(),
+                    RawResource::new("instagram://media/recent", "Recent Media Posts")
+                    .with_description("Recent Instagram posts with engagement metrics")
+                    .with_mime_type("application/json")
+                    .no_annotation(),
+                    RawResource::new("instagram://insights/account", "Account Insights")
+                    .with_description("Account-level analytics and insights")
+                    .with_mime_type("application/json")
+                    .no_annotation(),
+                    RawResource::new("instagram://pages", "Connected Pages")
+                    .with_description("Facebook pages connected to the account")
+                    .with_mime_type("application/json")
+                    .no_annotation(),                     
+                ]
+            }
+        )
+    }
+
+    async fn read_resource(
+        &self,
+        request: ReadResourceRequestParams,
+        _context: RequestContext<RoleServer>) -> Result<ReadResourceResult, McpError> {
+        let client = INSTAGRAM_CLIENT
+            .get()
+            .expect("SSE client must be initialized before tool handlers run");
+        let uri = &request.uri;
+        match uri.as_str() {
+            "instagram://profile" => {
+                let profile_info: InstagramProfile = client.get_profile_info(None).await.unwrap();
+                Ok(
+                    ReadResourceResult::new(vec![
+                        ResourceContents::blob(serde_json::to_string(&profile_info).unwrap(), uri)
+                    ])
+                )
+            },
+            "instagram://media/recent" => {
+                let media_posts: Vec<InstagramMedia> = client.get_media_posts(None, 25, None).await.unwrap();
+                Ok(ReadResourceResult::new(vec![
+                    ResourceContents::blob(serde_json::to_string(&media_posts).unwrap(), uri)
+                ]))
+            },
+            "instagram://insights/account" => {
+                let account_insights = client.get_account_insights(None, None, InsightPeriod::Day).await.unwrap();
+                Ok(ReadResourceResult::new(vec![
+                    ResourceContents::blob(serde_json::to_string(&account_insights).unwrap(), uri)
+                ]))
+            },
+            "instagram://pages" => {
+                let pages = client.get_account_pages().await.unwrap();
+                Ok(ReadResourceResult::new(vec![
+                    ResourceContents::blob(serde_json::to_string(&pages).unwrap(), uri)
+                ]))
+            },
+            _ => Err(McpError::resource_not_found(
+                "resource_not_found",
+                Some(serde_json::json!({"uri": uri})),
+            )),
+        }
+    }
+
+    async fn list_resource_templates(
+        &self,
+        _request: Option<PaginatedRequestParams>,
+        _: RequestContext<RoleServer>,
+    ) -> Result<ListResourceTemplatesResult, McpError> {
+        Ok(ListResourceTemplatesResult {
+            next_cursor: None,
+            resource_templates: Vec::new(),
+            meta: None,
+        })
+    }
 }
 
 pub async fn mcp_server_run_sse(client: Arc<InstagramClient>) -> Result<(), std::io::Error> {
@@ -427,8 +632,7 @@ pub async fn mcp_server_run_sse(client: Arc<InstagramClient>) -> Result<(), std:
     );
 
     let router = axum::Router::new().nest_service("/sse", service);
-    let tcp_listener = tokio::net::TcpListener::bind("127.0.0.1:9091")
-        .await?;
+    let tcp_listener = tokio::net::TcpListener::bind("127.0.0.1:9091").await?;
     let _ = axum::serve(tcp_listener, router)
         .with_graceful_shutdown(async move {
             tokio::signal::ctrl_c().await.unwrap();
