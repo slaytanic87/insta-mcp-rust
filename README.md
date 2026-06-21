@@ -283,13 +283,13 @@ Long-lived tokens expire after 60 days. Implement automatic refresh:
 ```python
 # Check token validity
 def check_token_validity(access_token):
-    url = f"https://graph.facebook.com/v19.0/me?access_token={access_token}"
+    url = f"https://graph.facebook.com/v25.0/me?access_token={access_token}"
     response = requests.get(url)
     return response.status_code == 200
 
 # Refresh token before expiration
 def refresh_long_lived_token(access_token, app_id, app_secret):
-    url = f"https://graph.facebook.com/v19.0/oauth/access_token"
+    url = f"https://graph.facebook.com/v25.0/oauth/access_token"
     params = {
         'grant_type': 'fb_exchange_token',
         'client_id': app_id,

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::num::NonZeroU32;
+use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 use chrono::{Duration, Utc};
@@ -8,7 +9,7 @@ use governor::state::InMemoryState;
 use governor::state::direct::NotKeyed;
 use governor::{Quota, RateLimiter};
 use image::ImageReader;
-use reqwest::Client;
+use reqwest::{Client, Error, StatusCode};
 use serde_json::{Value, json};
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
@@ -168,7 +169,7 @@ impl InstagramClient {
         self.limiter.until_ready().await;
 
         let base_url: String = if use_facebook_api {
-            "https://graph.facebook.com/v22.0".to_string()
+            "https://graph.facebook.com/v25.0".to_string()
         } else {
             self.settings.instagram_api_url()
         };
@@ -687,7 +688,40 @@ impl InstagramClient {
         })
     }
 
-    pub fn get_rate_limit_info(&self) -> RateLimitInfo {
+    pub async fn check_token_validy(&self) -> Result<bool, Error> {
+        let mut params = HashMap::new();
+        params.insert("access_token", self.settings.instagram_access_token.clone());
+        let url_with_param: Url =
+            reqwest::Url::parse_with_params("https://graph.facebook.com/v25.0/me", &params)
+                .unwrap();
+        let response = self.http.get(url_with_param).send().await?;
+        Ok(response.status().eq(&StatusCode::OK.as_u16()))
+    }
+
+    pub async fn refresh_long_lived_token(&self) -> Result<String, Error> {
+        let mut params = HashMap::new();
+        params.insert("grant_type", "fb_exchange_token".to_string());
+        params.insert("client_id", self.settings.facebook_app_id.clone());
+        params.insert("client_secret", self.settings.facebook_app_secret.clone());
+        params.insert(
+            "fb_exchange_token",
+            self.settings.instagram_access_token.clone(),
+        );
+
+        let url_with_param: Url = reqwest::Url::parse_with_params(
+            "https://graph.facebook.com/v25.0/oauth/access_token",
+            &params,
+        )
+        .unwrap();
+        let response = self.http.get(url_with_param).send().await?;
+        let json_response: serde_json::Value = response.json().await?;
+        Ok(json_response["access_token"]
+            .as_str()
+            .unwrap_or("")
+            .to_string())
+    }
+
+    pub fn _get_rate_limit_info(&self) -> RateLimitInfo {
         RateLimitInfo {
             app_id: self.settings.facebook_app_id.clone(),
             call_count: 0,
@@ -696,8 +730,8 @@ impl InstagramClient {
         }
     }
 
-    pub fn settings(&self) -> Arc<Settings> {
-        self.settings.clone()
+    pub fn set_access_token(&self, access_token: String) {
+        self.settings.instagram_access_token = Arc::new(access_token);
     }
 
     pub fn log_request_error(&self, context: &str, error: &AppError) {

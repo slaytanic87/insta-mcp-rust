@@ -9,6 +9,7 @@ chrono = { version = "0.4", features = ["serde"] }
 dotenvy = "0.15"
 governor = "0.10.4"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp"] }
+periodically = "0.2.0"
 reqwest = { version = "0.13.4", default-features = false, features = ["json", "native-tls"] }
 rmcp = { version= "1.7.0", features= [
     "server",

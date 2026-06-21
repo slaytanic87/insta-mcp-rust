@@ -4,6 +4,7 @@ mod instagram_client;
 mod mcp_server_sse;
 mod mcp_server_stdio;
 mod models;
+mod token_refresh_ticker;
 
 use std::sync::Arc;
 
@@ -12,7 +13,10 @@ use instagram_client::InstagramClient;
 use mcp_server_stdio::InstagramMcpServer;
 use tracing::{error, info, warn};
 
-use crate::mcp_server_sse::mcp_server_run_sse;
+use crate::{
+    mcp_server_sse::mcp_server_run_sse,
+    token_refresh_ticker::create_and_run_instagram_token_validity_task,
+};
 
 #[tokio::main]
 async fn main() {
@@ -47,6 +51,7 @@ async fn main() {
         warn!("Instagram access token validation failed on startup");
     } else {
         info!("Instagram access token validated successfully");
+        create_and_run_instagram_token_validity_task(client.clone());
     }
 
     if settings.mcp_transport.to_lowercase() == "sse" {
@@ -58,7 +63,10 @@ async fn main() {
         }
         std::process::exit(1);
     } else {
-        error!("Only stdio or sse MCP_TRANSPORT values are supported, received: {} as value", settings.mcp_transport);
+        error!(
+            "Only stdio or sse MCP_TRANSPORT values are supported, received: {} as value",
+            settings.mcp_transport
+        );
     }
 }
 

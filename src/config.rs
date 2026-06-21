@@ -1,10 +1,10 @@
-use std::env;
+use std::{env, sync::Arc};
 
 use crate::error::AppError;
 
 #[derive(Debug, Clone)]
 pub struct Settings {
-    pub instagram_access_token: String,
+    pub instagram_access_token: Arc<String>,
     pub facebook_app_id: String,
     pub facebook_app_secret: String,
     pub instagram_business_account_id: Option<String>,
@@ -69,7 +69,7 @@ impl Settings {
         }
 
         Ok(Self {
-            instagram_access_token,
+            instagram_access_token: Arc::new(instagram_access_token),
             facebook_app_id,
             facebook_app_secret,
             instagram_business_account_id: env_optional("INSTAGRAM_BUSINESS_ACCOUNT_ID"),

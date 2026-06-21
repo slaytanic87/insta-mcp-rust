@@ -888,6 +888,7 @@ dependencies = [
  "dotenvy",
  "governor",
  "image",
+ "periodically",
  "reqwest",
  "rmcp",
  "schemars",
@@ -1150,6 +1151,16 @@ name = "percent-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
+
+[[package]]
+name = "periodically"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e78a6e8c41af92ead455e0fa6e0e65f17f5eb6273dacb36e81c450b3bc201dd1"
+dependencies = [
+ "log",
+ "tokio",
+]
 
 [[package]]
 name = "pin-project-lite"
