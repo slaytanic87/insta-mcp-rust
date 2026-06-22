@@ -720,10 +720,6 @@ impl InstagramClient {
             .to_string())
     }
 
-    pub fn set_settings(&mut self, settings: Arc<Settings>) {
-        self.settings = settings;
-    }
-
     pub fn _get_rate_limit_info(&self) -> RateLimitInfo {
         RateLimitInfo {
             app_id: self.settings.facebook_app_id.clone(),

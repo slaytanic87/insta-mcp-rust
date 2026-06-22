@@ -7,7 +7,7 @@ use envie::Envie;
 use periodically::{AsyncTask, IntervalSchedule, Scheduler};
 use tracing::{debug, error};
 
-use crate::{config::Settings, instagram_client::InstagramClient};
+use crate::{instagram_client::InstagramClient};
 
 static INSTAGRAM_CLIENT: OnceLock<Arc<InstagramClient>> = OnceLock::new();
 
