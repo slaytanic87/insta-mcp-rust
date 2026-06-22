@@ -1,10 +1,11 @@
-use std::{env, sync::Arc};
+use std::env;
+
+use envie::Envie;
 
 use crate::error::AppError;
 
 #[derive(Debug, Clone)]
 pub struct Settings {
-    pub instagram_access_token: Arc<String>,
     pub facebook_app_id: String,
     pub facebook_app_secret: String,
     pub instagram_business_account_id: Option<String>,
@@ -38,8 +39,6 @@ pub struct Settings {
 
 impl Settings {
     pub fn from_env() -> Result<Self, AppError> {
-        let instagram_access_token =
-            env_required("INSTAGRAM_ACCESS_TOKEN", "Instagram access token")?;
         let facebook_app_id = env_required("FACEBOOK_APP_ID", "Facebook app ID")?;
         let facebook_app_secret = env_required("FACEBOOK_APP_SECRET", "Facebook app secret")?;
 
@@ -69,7 +68,6 @@ impl Settings {
         }
 
         Ok(Self {
-            instagram_access_token: Arc::new(instagram_access_token),
             facebook_app_id,
             facebook_app_secret,
             instagram_business_account_id: env_optional("INSTAGRAM_BUSINESS_ACCOUNT_ID"),
@@ -118,6 +116,12 @@ impl Settings {
     pub fn max_request_size_bytes(&self) -> u64 {
         self.max_request_size_mb * 1024 * 1024
     }
+}
+
+pub fn get_access_token_from_env() -> String {
+    let env = Envie::load().expect("Failed to load env. file");
+    env.get("INSTAGRAM_ACCESS_TOKEN")
+        .expect("INSTAGRAM_ACCESS_TOKEN not set")
 }
 
 fn env_required(key: &str, label: &str) -> Result<String, AppError> {

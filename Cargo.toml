@@ -7,6 +7,7 @@ edition = "2024"
 axum = { version = "0.8.9", features = ["macros"] }
 chrono = { version = "0.4", features = ["serde"] }
 dotenvy = "0.15"
+envie = "0.2.1"
 governor = "0.10.4"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp"] }
 periodically = "0.2.0"

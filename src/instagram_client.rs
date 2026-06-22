@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::num::NonZeroU32;
-use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 use chrono::{Duration, Utc};
@@ -155,7 +154,7 @@ impl InstagramClient {
     ) -> Result<Value, AppError> {
         params.insert(
             "access_token".to_string(),
-            self.settings.instagram_access_token.clone(),
+            crate::config::get_access_token_from_env(),
         );
 
         let cache_key = self.cache_key(endpoint, &params);
@@ -690,7 +689,7 @@ impl InstagramClient {
 
     pub async fn check_token_validy(&self) -> Result<bool, Error> {
         let mut params = HashMap::new();
-        params.insert("access_token", self.settings.instagram_access_token.clone());
+        params.insert("access_token", crate::config::get_access_token_from_env());
         let url_with_param: Url =
             reqwest::Url::parse_with_params("https://graph.facebook.com/v25.0/me", &params)
                 .unwrap();
@@ -705,7 +704,7 @@ impl InstagramClient {
         params.insert("client_secret", self.settings.facebook_app_secret.clone());
         params.insert(
             "fb_exchange_token",
-            self.settings.instagram_access_token.clone(),
+            crate::config::get_access_token_from_env(),
         );
 
         let url_with_param: Url = reqwest::Url::parse_with_params(
@@ -721,6 +720,10 @@ impl InstagramClient {
             .to_string())
     }
 
+    pub fn set_settings(&mut self, settings: Arc<Settings>) {
+        self.settings = settings;
+    }
+
     pub fn _get_rate_limit_info(&self) -> RateLimitInfo {
         RateLimitInfo {
             app_id: self.settings.facebook_app_id.clone(),
@@ -728,10 +731,6 @@ impl InstagramClient {
             total_cputime: 0,
             total_time: 0,
         }
-    }
-
-    pub fn set_access_token(&self, access_token: String) {
-        self.settings.instagram_access_token = Arc::new(access_token);
     }
 
     pub fn log_request_error(&self, context: &str, error: &AppError) {

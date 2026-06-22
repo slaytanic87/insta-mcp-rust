@@ -1,12 +1,23 @@
-use std::{sync::{Arc, Mutex, OnceLock}};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use rmcp::{
-    ErrorData as McpError, RoleServer, ServerHandler, handler::server::{router::prompt::PromptRouter, tool::ToolRouter, wrapper::Parameters}, model::{
-        AnnotateAble, CallToolResult, Content, Implementation, InitializeRequestParams, InitializeResult, ListResourceTemplatesResult, ListResourcesResult, Meta, PaginatedRequestParams, PromptMessage, PromptMessageRole, ProtocolVersion, RawResource, ReadResourceRequestParams, ReadResourceResult, ResourceContents, ServerCapabilities, ServerInfo
-    }, prompt, prompt_router, schemars, service::RequestContext, task_manager::{OperationProcessor}, tool, tool_handler, tool_router, transport::{
+    ErrorData as McpError, RoleServer, ServerHandler,
+    handler::server::{router::prompt::PromptRouter, tool::ToolRouter, wrapper::Parameters},
+    model::{
+        AnnotateAble, CallToolResult, Content, Implementation, InitializeRequestParams,
+        InitializeResult, ListResourceTemplatesResult, ListResourcesResult, Meta,
+        PaginatedRequestParams, PromptMessage, PromptMessageRole, ProtocolVersion, RawResource,
+        ReadResourceRequestParams, ReadResourceResult, ResourceContents, ServerCapabilities,
+        ServerInfo,
+    },
+    prompt, prompt_router, schemars,
+    service::RequestContext,
+    task_manager::OperationProcessor,
+    tool, tool_handler, tool_router,
+    transport::{
         StreamableHttpServerConfig, StreamableHttpService,
         streamable_http_server::session::local::LocalSessionManager,
-    }
+    },
 };
 
 use serde::Deserialize;
@@ -140,12 +151,11 @@ struct HashtagAnalysisPrompt {
 struct InstagramMcpServerSse {
     tool_router: ToolRouter<InstagramMcpServerSse>,
     prompt_router: PromptRouter<InstagramMcpServerSse>,
-    processor: Arc<Mutex<OperationProcessor>>
+    processor: Arc<Mutex<OperationProcessor>>,
 }
 
 #[tool_router]
 impl InstagramMcpServerSse {
-
     pub fn new() -> Self {
         Self {
             tool_router: Self::tool_router(),
@@ -397,10 +407,7 @@ impl InstagramMcpServerSse {
     )]
     async fn analyze_engagement(
         &self,
-        Parameters(AnalyzeEngagementPrompt {
-            media_id,
-            ..
-        }): Parameters<AnalyzeEngagementPrompt>,
+        Parameters(AnalyzeEngagementPrompt { media_id, .. }): Parameters<AnalyzeEngagementPrompt>,
         _context: RequestContext<RoleServer>,
     ) -> Result<Vec<PromptMessage>, McpError> {
         let client = INSTAGRAM_CLIENT
@@ -541,37 +548,40 @@ impl ServerHandler for InstagramMcpServerSse {
          "#.to_string())
     }
 
-    async fn list_resources(&self, _request: Option<PaginatedRequestParams>, _context: RequestContext<RoleServer>) -> Result<ListResourcesResult, McpError> {
-        Ok(
-            ListResourcesResult { 
-                meta: None,
-                next_cursor: None,
-                resources: vec![
-                    RawResource::new("instagram://profile", "Instagram Profile")
+    async fn list_resources(
+        &self,
+        _request: Option<PaginatedRequestParams>,
+        _context: RequestContext<RoleServer>,
+    ) -> Result<ListResourcesResult, McpError> {
+        Ok(ListResourcesResult {
+            meta: None,
+            next_cursor: None,
+            resources: vec![
+                RawResource::new("instagram://profile", "Instagram Profile")
                     .with_description("Current Instagram business profile information")
                     .with_mime_type("application/json")
                     .no_annotation(),
-                    RawResource::new("instagram://media/recent", "Recent Media Posts")
+                RawResource::new("instagram://media/recent", "Recent Media Posts")
                     .with_description("Recent Instagram posts with engagement metrics")
                     .with_mime_type("application/json")
                     .no_annotation(),
-                    RawResource::new("instagram://insights/account", "Account Insights")
+                RawResource::new("instagram://insights/account", "Account Insights")
                     .with_description("Account-level analytics and insights")
                     .with_mime_type("application/json")
                     .no_annotation(),
-                    RawResource::new("instagram://pages", "Connected Pages")
+                RawResource::new("instagram://pages", "Connected Pages")
                     .with_description("Facebook pages connected to the account")
                     .with_mime_type("application/json")
-                    .no_annotation(),                     
-                ]
-            }
-        )
+                    .no_annotation(),
+            ],
+        })
     }
 
     async fn read_resource(
         &self,
         request: ReadResourceRequestParams,
-        _context: RequestContext<RoleServer>) -> Result<ReadResourceResult, McpError> {
+        _context: RequestContext<RoleServer>,
+    ) -> Result<ReadResourceResult, McpError> {
         let client = INSTAGRAM_CLIENT
             .get()
             .expect("SSE client must be initialized before tool handlers run");
@@ -579,30 +589,36 @@ impl ServerHandler for InstagramMcpServerSse {
         match uri.as_str() {
             "instagram://profile" => {
                 let profile_info: InstagramProfile = client.get_profile_info(None).await.unwrap();
-                Ok(
-                    ReadResourceResult::new(vec![
-                        ResourceContents::blob(serde_json::to_string(&profile_info).unwrap(), uri)
-                    ])
-                )
-            },
+                Ok(ReadResourceResult::new(vec![ResourceContents::blob(
+                    serde_json::to_string(&profile_info).unwrap(),
+                    uri,
+                )]))
+            }
             "instagram://media/recent" => {
-                let media_posts: Vec<InstagramMedia> = client.get_media_posts(None, 25, None).await.unwrap();
-                Ok(ReadResourceResult::new(vec![
-                    ResourceContents::blob(serde_json::to_string(&media_posts).unwrap(), uri)
-                ]))
-            },
+                let media_posts: Vec<InstagramMedia> =
+                    client.get_media_posts(None, 25, None).await.unwrap();
+                Ok(ReadResourceResult::new(vec![ResourceContents::blob(
+                    serde_json::to_string(&media_posts).unwrap(),
+                    uri,
+                )]))
+            }
             "instagram://insights/account" => {
-                let account_insights = client.get_account_insights(None, None, InsightPeriod::Day).await.unwrap();
-                Ok(ReadResourceResult::new(vec![
-                    ResourceContents::blob(serde_json::to_string(&account_insights).unwrap(), uri)
-                ]))
-            },
+                let account_insights = client
+                    .get_account_insights(None, None, InsightPeriod::Day)
+                    .await
+                    .unwrap();
+                Ok(ReadResourceResult::new(vec![ResourceContents::blob(
+                    serde_json::to_string(&account_insights).unwrap(),
+                    uri,
+                )]))
+            }
             "instagram://pages" => {
                 let pages = client.get_account_pages().await.unwrap();
-                Ok(ReadResourceResult::new(vec![
-                    ResourceContents::blob(serde_json::to_string(&pages).unwrap(), uri)
-                ]))
-            },
+                Ok(ReadResourceResult::new(vec![ResourceContents::blob(
+                    serde_json::to_string(&pages).unwrap(),
+                    uri,
+                )]))
+            }
             _ => Err(McpError::resource_not_found(
                 "resource_not_found",
                 Some(serde_json::json!({"uri": uri})),
