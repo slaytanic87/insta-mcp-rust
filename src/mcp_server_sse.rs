@@ -509,11 +509,28 @@ impl InstagramMcpServerSse {
         let client = INSTAGRAM_CLIENT
             .get()
             .expect("SSE client must be initialized before tool handlers run");
-        let posts = client.get_media_posts(None, 20, None).await.unwrap();
-        let account_insights = client
+        let posts_rs = client.get_media_posts(None, 20, None).await;
+
+        if let Err(e) = posts_rs {
+            return Err(McpError::internal_error(
+                "get_media_posts_failed",
+                Some(serde_json::json!({ "error": e.to_string() })),
+            ));
+        }
+        let posts = posts_rs.unwrap();
+
+        let account_insights_rs = client
             .get_account_insights(None, None, InsightPeriod::Day)
-            .await
-            .unwrap();
+            .await;
+
+        if let Err(e) = account_insights_rs {
+            return Err(McpError::internal_error(
+                "get_account_insights_failed",
+                Some(serde_json::json!({ "error": e.to_string() })),
+            ));
+        }
+        let account_insights = account_insights_rs.unwrap();
+
         let preview_posts = posts.into_iter().take(5).collect::<Vec<_>>();
         let focus_area_str = focus_area.clone().unwrap_or("engagement".to_string());
         let time_period_str = time_period.clone().unwrap_or("week".to_string());
