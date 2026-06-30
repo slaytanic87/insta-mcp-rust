@@ -26,9 +26,8 @@ use url::Url;
 use crate::{
     instagram_client::InstagramClient,
     models::{
-        AccountInsight, FacebookPage, InsightMetric, InsightPeriod, InstagramMedia,
-        InstagramProfile, MediaInsight, PublishMediaRequest, PublishMediaResponse, SendDmRequest,
-        SendDmResponse,
+        FacebookPage, InsightMetric, InsightPeriod, InstagramMedia, InstagramProfile, MediaInsight,
+        PublishMediaRequest, PublishMediaResponse, SendDmRequest, SendDmResponse,
     },
 };
 
