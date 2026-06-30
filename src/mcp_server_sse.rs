@@ -26,8 +26,9 @@ use url::Url;
 use crate::{
     instagram_client::InstagramClient,
     models::{
-        AccountInsight, InsightMetric, InsightPeriod, InstagramMedia, InstagramProfile,
-        PublishMediaRequest, SendDmRequest, SendDmResponse,
+        AccountInsight, FacebookPage, InsightMetric, InsightPeriod, InstagramMedia,
+        InstagramProfile, MediaInsight, PublishMediaRequest, PublishMediaResponse, SendDmRequest,
+        SendDmResponse,
     },
 };
 
@@ -173,7 +174,14 @@ impl InstagramMcpServerSse {
         let client = INSTAGRAM_CLIENT
             .get()
             .expect("SSE client must be initialized before tool handlers run");
-        let profile_info: InstagramProfile = client.get_profile_info(account_id).await.unwrap();
+        let profile_info_rs = client.get_profile_info(account_id).await;
+        if let Err(e) = profile_info_rs {
+            return Err(McpError::internal_error(
+                "get_profile_info_failed",
+                Some(serde_json::json!({ "error": e.to_string() })),
+            ));
+        }
+        let profile_info = profile_info_rs.unwrap();
         Ok(CallToolResult::structured(serde_json::json!(profile_info)))
     }
 
@@ -189,10 +197,17 @@ impl InstagramMcpServerSse {
         let client = INSTAGRAM_CLIENT
             .get()
             .expect("SSE client must be initialized before tool handlers run");
-        let media_posts: Vec<InstagramMedia> = client
+        let media_posts_rs = client
             .get_media_posts(account_id, limit.unwrap_or(25), after)
-            .await
-            .unwrap();
+            .await;
+
+        if let Err(e) = media_posts_rs {
+            return Err(McpError::internal_error(
+                "get_media_posts_failed",
+                Some(serde_json::json!({ "error": e.to_string() })),
+            ));
+        }
+        let media_posts: Vec<InstagramMedia> = media_posts_rs.unwrap();
         Ok(CallToolResult::structured(serde_json::json!(media_posts)))
     }
 
@@ -220,10 +235,14 @@ impl InstagramMcpServerSse {
                 .collect()
         });
 
-        let insights = client
-            .get_media_insights(media_id, mapped_metrics)
-            .await
-            .unwrap();
+        let insights_rs = client.get_media_insights(media_id, mapped_metrics).await;
+        if let Err(e) = insights_rs {
+            return Err(McpError::internal_error(
+                "get_media_insights_failed",
+                Some(serde_json::json!({ "error": e.to_string() })),
+            ));
+        }
+        let insights: Vec<MediaInsight> = insights_rs.unwrap();
         Ok(CallToolResult::structured(serde_json::json!(insights)))
     }
 
@@ -258,7 +277,16 @@ impl InstagramMcpServerSse {
             location_id,
             user_tags: None,
         };
-        let publish_result = client.publish_media(request).await.unwrap();
+        let publish_result_rs = client.publish_media(request).await;
+
+        if let Err(e) = publish_result_rs {
+            return Err(McpError::internal_error(
+                "publish_media_failed",
+                Some(serde_json::json!({ "error": e.to_string() })),
+            ));
+        }
+        let publish_result: PublishMediaResponse = publish_result_rs.unwrap();
+
         Ok(CallToolResult::structured(serde_json::json!(
             publish_result
         )))
@@ -272,7 +300,16 @@ impl InstagramMcpServerSse {
         let client = INSTAGRAM_CLIENT
             .get()
             .expect("SSE client must be initialized before tool handlers run");
-        let pages = client.get_account_pages().await.unwrap();
+        let pages_rs = client.get_account_pages().await;
+
+        if let Err(e) = pages_rs {
+            return Err(McpError::internal_error(
+                "get_account_pages_failed",
+                Some(serde_json::json!({ "error": e.to_string() })),
+            ));
+        }
+        let pages: Vec<FacebookPage> = pages_rs.unwrap();
+
         Ok(CallToolResult::structured(serde_json::json!(pages)))
     }
 
@@ -296,12 +333,18 @@ impl InstagramMcpServerSse {
         } else {
             InsightPeriod::Day
         };
-        let insights: Vec<AccountInsight> = client
+        let insights_rs = client
             .get_account_insights(account_id, metrics, period_enum)
-            .await
-            .unwrap();
+            .await;
+        if let Err(e) = insights_rs {
+            return Err(McpError::internal_error(
+                "get_account_insights_failed",
+                Some(serde_json::json!({ "error": e.to_string() })),
+            ));
+        }
+
         Ok(CallToolResult::structured(
-            serde_json::json!({ "insights": insights }),
+            serde_json::json!({ "insights": insights_rs.unwrap() }),
         ))
     }
 
@@ -329,10 +372,15 @@ impl InstagramMcpServerSse {
         let client = INSTAGRAM_CLIENT
             .get()
             .expect("SSE client must be initialized before tool handlers run");
-        let conversations = client
-            .get_conversations(page_id, limit.unwrap_or(25))
-            .await
-            .unwrap();
+        let conversations_rs = client.get_conversations(page_id, limit.unwrap_or(25)).await;
+
+        if let Err(e) = conversations_rs {
+            return Err(McpError::internal_error(
+                "get_conversations_failed",
+                Some(serde_json::json!({ "error": e.to_string() })),
+            ));
+        }
+        let conversations = conversations_rs.unwrap();
         Ok(CallToolResult::structured(serde_json::json!({
             "conversations": conversations,
             "count": conversations.len()
@@ -350,10 +398,18 @@ impl InstagramMcpServerSse {
         let client = INSTAGRAM_CLIENT
             .get()
             .expect("SSE client must be initialized before tool handlers run");
-        let messages = client
+        let messages_rs = client
             .get_conversation_messages(conversation_id.clone(), limit.unwrap_or(25))
-            .await
-            .unwrap();
+            .await;
+
+        if let Err(e) = messages_rs {
+            return Err(McpError::internal_error(
+                "get_conversation_messages_failed",
+                Some(serde_json::json!({ "error": e.to_string() })),
+            ));
+        }
+        let messages = messages_rs.unwrap();
+
         Ok(CallToolResult::structured(serde_json::json!({
             "conversation_id": conversation_id,
             "messages": messages,
@@ -377,7 +433,16 @@ impl InstagramMcpServerSse {
             message,
             message_type: None,
         };
-        let response: SendDmResponse = client.send_dm(request).await.unwrap();
+        let response_rs = client.send_dm(request).await;
+
+        if let Err(e) = response_rs {
+            return Err(McpError::internal_error(
+                "send_dm_failed",
+                Some(serde_json::json!({ "error": e.to_string() })),
+            ));
+        }
+        let response: SendDmResponse = response_rs.unwrap();
+
         Ok(CallToolResult::structured(serde_json::json!(response)))
     }
 
@@ -413,10 +478,15 @@ impl InstagramMcpServerSse {
             .get()
             .expect("SSE client must be initialized before tool handlers run");
 
-        let insights = client
-            .get_media_insights(media_id.to_string(), None)
-            .await
-            .unwrap();
+        let insights_rs = client.get_media_insights(media_id.to_string(), None).await;
+        if let Err(e) = insights_rs {
+            return Err(McpError::internal_error(
+                "get_media_insights_failed",
+                Some(serde_json::json!({ "error": e.to_string() })),
+            ));
+        }
+
+        let insights = insights_rs.unwrap();
         let prompt = format!(
             "Analyze the engagement metrics for Instagram post {}:\n\nInsights Data:\n{}\n\nPlease provide:\n1. Overall engagement performance assessment\n2. Key metrics analysis (impressions, reach, likes, comments, shares)\n3. Engagement rate calculation and interpretation\n4. Recommendations for improving future posts\n5. Comparison with typical performance benchmarks",
             media_id,
@@ -476,10 +546,16 @@ impl InstagramMcpServerSse {
             .expect("SSE client must be initialized before tool handlers run");
         let post_count_value: u32 = post_count.unwrap_or(10);
 
-        let posts: Vec<InstagramMedia> = client
-            .get_media_posts(None, post_count_value, None)
-            .await
-            .unwrap();
+        let posts_rs = client.get_media_posts(None, post_count_value, None).await;
+
+        if let Err(e) = posts_rs {
+            return Err(McpError::internal_error(
+                "get_media_posts_failed",
+                Some(serde_json::json!({ "error": e.to_string() })),
+            ));
+        }
+        let posts = posts_rs.unwrap();
+
         let hashtags_data: Vec<Value> = posts
             .into_iter()
             .filter_map(|post| {
