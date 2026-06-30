@@ -4,11 +4,10 @@ use rmcp::{
     ErrorData as McpError, RoleServer, ServerHandler,
     handler::server::{router::prompt::PromptRouter, tool::ToolRouter, wrapper::Parameters},
     model::{
-        AnnotateAble, CallToolResult, Content, Implementation, InitializeRequestParams,
-        InitializeResult, ListResourceTemplatesResult, ListResourcesResult, Meta,
-        PaginatedRequestParams, PromptMessage, PromptMessageRole, ProtocolVersion, RawResource,
-        ReadResourceRequestParams, ReadResourceResult, ResourceContents, ServerCapabilities,
-        ServerInfo,
+        CallToolResult, ContentBlock, Implementation, InitializeRequestParams, InitializeResult,
+        ListResourceTemplatesResult, ListResourcesResult, Meta, PaginatedRequestParams,
+        PromptMessage, ProtocolVersion, ReadResourceRequestParams, ReadResourceResult, Resource,
+        ResourceContents, Role, ServerCapabilities, ServerInfo,
     },
     prompt, prompt_router, schemars,
     service::RequestContext,
@@ -391,8 +390,8 @@ impl InstagramMcpServerSse {
             .and_then(|parts| parts.headers.get("mcp-session-id"))
             .map(|v| v.to_str().unwrap_or("(non-ascii)").to_owned());
         match session_id {
-            Some(id) => Ok(CallToolResult::success(vec![Content::text(id)])),
-            None => Ok(CallToolResult::success(vec![Content::text(
+            Some(id) => Ok(CallToolResult::success(vec![ContentBlock::text(id)])),
+            None => Ok(CallToolResult::success(vec![ContentBlock::text(
                 "No session (not running over streamable HTTP?)",
             )])),
         }
@@ -423,10 +422,7 @@ impl InstagramMcpServerSse {
             media_id,
             serde_json::to_string_pretty(&insights).unwrap_or_else(|_| "[]".to_string())
         );
-        Ok(vec![PromptMessage::new_text(
-            PromptMessageRole::User,
-            prompt,
-        )])
+        Ok(vec![PromptMessage::new_text(Role::User, prompt)])
     }
 
     #[prompt(
@@ -463,10 +459,7 @@ impl InstagramMcpServerSse {
             time_period_str,
         );
 
-        Ok(vec![PromptMessage::new_text(
-            PromptMessageRole::User,
-            prompt,
-        )])
+        Ok(vec![PromptMessage::new_text(Role::User, prompt)])
     }
 
     #[prompt(
@@ -510,10 +503,7 @@ impl InstagramMcpServerSse {
             serde_json::to_string_pretty(&hashtags_data).unwrap_or_else(|_| "[]".to_string())
         );
 
-        Ok(vec![PromptMessage::new_text(
-            PromptMessageRole::User,
-            prompt,
-        )])
+        Ok(vec![PromptMessage::new_text(Role::User, prompt)])
     }
 }
 
@@ -557,22 +547,18 @@ impl ServerHandler for InstagramMcpServerSse {
             meta: None,
             next_cursor: None,
             resources: vec![
-                RawResource::new("instagram://profile", "Instagram Profile")
+                Resource::new("instagram://profile", "Instagram Profile")
                     .with_description("Current Instagram business profile information")
-                    .with_mime_type("application/json")
-                    .no_annotation(),
-                RawResource::new("instagram://media/recent", "Recent Media Posts")
+                    .with_mime_type("application/json"),
+                Resource::new("instagram://media/recent", "Recent Media Posts")
                     .with_description("Recent Instagram posts with engagement metrics")
-                    .with_mime_type("application/json")
-                    .no_annotation(),
-                RawResource::new("instagram://insights/account", "Account Insights")
+                    .with_mime_type("application/json"),
+                Resource::new("instagram://insights/account", "Account Insights")
                     .with_description("Account-level analytics and insights")
-                    .with_mime_type("application/json")
-                    .no_annotation(),
-                RawResource::new("instagram://pages", "Connected Pages")
+                    .with_mime_type("application/json"),
+                Resource::new("instagram://pages", "Connected Pages")
                     .with_description("Facebook pages connected to the account")
-                    .with_mime_type("application/json")
-                    .no_annotation(),
+                    .with_mime_type("application/json"),
             ],
         })
     }
