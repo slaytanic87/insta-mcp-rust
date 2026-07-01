@@ -64,12 +64,8 @@ LOG_LEVEL=INFO
 
 ## ✅ Test Your Setup
 
-Run the setup script:
-```bash
-python scripts/setup.py
-```
+Test manually:
 
-Or test manually:
 ```python
 import requests
 import os
@@ -78,6 +74,13 @@ import os
 access_token = "YOUR_ACCESS_TOKEN"
 response = requests.get(f'https://graph.facebook.com/v19.0/me?access_token={access_token}')
 print(response.json())
+```
+
+Or
+
+```bash
+export access_token = <Your token>
+curl https://graph.facebook.com/v19.0/me?access_token=${access_token}
 ```
 
 ## 🚨 Common Issues & Solutions
@@ -159,4 +162,4 @@ def refresh_token(current_token, app_id, app_secret):
 1. Check the [troubleshooting section](README.md#troubleshooting) in README
 2. Use Facebook's [Access Token Debugger](https://developers.facebook.com/tools/debug/accesstoken)
 3. Review Instagram API [error codes](https://developers.facebook.com/docs/instagram-api/reference/error-codes)
-4. Run the setup script: `python scripts/setup.py` 
+4. Run the setup script: `python scripts/setup.py`
