@@ -131,7 +131,7 @@ Your app is currently in **Development Mode**, which means:
 ## Testing Before Approval
 
 ### What Works (Standard Access)
-```python
+```rust
 # ✅ These work immediately
 client.get_profile_info()
 client.get_media_posts()
@@ -142,7 +142,7 @@ client.get_account_pages()
 ```
 
 ### What Requires Advanced Access
-```python
+```rust
 # ❌ These fail with "#2 Service temporarily unavailable"
 client.get_conversations(page_id)
 client.get_conversation_messages(conversation_id)

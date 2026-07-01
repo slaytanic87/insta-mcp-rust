@@ -162,4 +162,3 @@ def refresh_token(current_token, app_id, app_secret):
 1. Check the [troubleshooting section](README.md#troubleshooting) in README
 2. Use Facebook's [Access Token Debugger](https://developers.facebook.com/tools/debug/accesstoken)
 3. Review Instagram API [error codes](https://developers.facebook.com/docs/instagram-api/reference/error-codes)
-4. Run the setup script: `python scripts/setup.py`

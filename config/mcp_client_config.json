@@ -6,7 +6,7 @@
         "run",
         "--release",
         "--manifest-path",
-        "/path/to/ig-mcp/ig-mcp-rust/Cargo.toml"
+        "/path/to/insta-mcp/insta-mcp-rust/Cargo.toml"
       ],
       "env": {
         "INSTAGRAM_ACCESS_TOKEN": "your_long_lived_access_token",
