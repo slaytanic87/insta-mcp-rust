@@ -15,7 +15,7 @@ use rmcp::{
     tool, tool_handler, tool_router,
     transport::{
         StreamableHttpServerConfig, StreamableHttpService,
-        streamable_http_server::session::local::LocalSessionManager,
+        streamable_http_server::session::local::{LocalSessionManager, SessionConfig},
     },
 };
 
@@ -720,9 +720,15 @@ impl ServerHandler for InstagramMcpServerSse {
 pub async fn mcp_server_run_sse(client: Arc<InstagramClient>) -> Result<(), std::io::Error> {
     let _ = INSTAGRAM_CLIENT.set(Arc::clone(&client));
 
+    let mut session_config = SessionConfig::default();
+    session_config.keep_alive = Some(std::time::Duration::from_hours(60));
+
+    let mut session_manager = LocalSessionManager::default();
+    session_manager.session_config = session_config;
+
     let service = StreamableHttpService::new(
         || Ok(InstagramMcpServerSse::new()),
-        LocalSessionManager::default().into(),
+        session_manager.into(),
         StreamableHttpServerConfig::default(),
     );
 
