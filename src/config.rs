@@ -12,29 +12,13 @@ pub struct Settings {
     pub instagram_api_version: String,
     pub instagram_api_base_url: String,
     pub rate_limit_requests_per_hour: u32,
-    pub rate_limit_posts_per_day: u32,
-    pub rate_limit_enable_backoff: bool,
     pub log_level: String,
     pub log_format: String,
-    pub log_file: Option<String>,
     pub cache_enabled: bool,
     pub cache_ttl_seconds: u64,
-    pub redis_url: Option<String>,
-    pub enable_request_validation: bool,
-    pub max_request_size_mb: u64,
-    pub allowed_image_formats: Vec<String>,
-    pub allowed_video_formats: Vec<String>,
-    pub debug_mode: bool,
-    pub mock_api_responses: bool,
-    pub enable_metrics: bool,
     pub mcp_server_name: String,
     pub mcp_server_version: String,
     pub mcp_transport: String,
-    pub database_url: Option<String>,
-    pub database_echo: bool,
-    pub webhook_verify_token: Option<String>,
-    pub webhook_secret: Option<String>,
-    pub webhook_url: Option<String>,
 }
 
 impl Settings {
@@ -74,35 +58,13 @@ impl Settings {
             instagram_api_version,
             instagram_api_base_url: env_or("INSTAGRAM_API_BASE_URL", "https://graph.facebook.com"),
             rate_limit_requests_per_hour: env_parse_or("RATE_LIMIT_REQUESTS_PER_HOUR", 200),
-            rate_limit_posts_per_day: env_parse_or("RATE_LIMIT_POSTS_PER_DAY", 25),
-            rate_limit_enable_backoff: env_bool_or("RATE_LIMIT_ENABLE_BACKOFF", true),
             log_level,
             log_format,
-            log_file: env_optional("LOG_FILE")
-                .or_else(|| Some("logs/instagram_mcp.log".to_string())),
             cache_enabled: env_bool_or("CACHE_ENABLED", true),
             cache_ttl_seconds: env_parse_or("CACHE_TTL_SECONDS", 300_u64),
-            redis_url: env_optional("REDIS_URL")
-                .or_else(|| Some("redis://localhost:6379/0".to_string())),
-            enable_request_validation: env_bool_or("ENABLE_REQUEST_VALIDATION", true),
-            max_request_size_mb: env_parse_or("MAX_REQUEST_SIZE_MB", 10_u64),
-            allowed_image_formats: env_csv_or(
-                "ALLOWED_IMAGE_FORMATS",
-                &["jpg", "jpeg", "png", "gif"],
-            ),
-            allowed_video_formats: env_csv_or("ALLOWED_VIDEO_FORMATS", &["mp4", "mov"]),
-            debug_mode: env_bool_or("DEBUG_MODE", false),
-            mock_api_responses: env_bool_or("MOCK_API_RESPONSES", false),
-            enable_metrics: env_bool_or("ENABLE_METRICS", true),
             mcp_server_name: env_or("MCP_SERVER_NAME", "instagram-mcp-server"),
             mcp_server_version: env_or("MCP_SERVER_VERSION", "1.0.0"),
-            mcp_transport: env_or("MCP_TRANSPORT", "stdio"),
-            database_url: env_optional("DATABASE_URL")
-                .or_else(|| Some("sqlite:///instagram_mcp.db".to_string())),
-            database_echo: env_bool_or("DATABASE_ECHO", false),
-            webhook_verify_token: env_optional("WEBHOOK_VERIFY_TOKEN"),
-            webhook_secret: env_optional("WEBHOOK_SECRET"),
-            webhook_url: env_optional("WEBHOOK_URL"),
+            mcp_transport: env_or("MCP_TRANSPORT", "stdio")
         })
     }
 
@@ -111,10 +73,6 @@ impl Settings {
             "{}/{}",
             self.instagram_api_base_url, self.instagram_api_version
         )
-    }
-
-    pub fn max_request_size_bytes(&self) -> u64 {
-        self.max_request_size_mb * 1024 * 1024
     }
 }
 
