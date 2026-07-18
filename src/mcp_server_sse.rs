@@ -176,7 +176,7 @@ impl InstagramMcpServerSse {
         let profile_info_rs = client.get_profile_info(account_id).await;
         if let Err(e) = profile_info_rs {
             return Err(McpError::internal_error(
-                "get_profile_info_failed",
+                "get_profile_info failed",
                 Some(serde_json::json!({ "error": e.to_string() })),
             ));
         }
@@ -202,7 +202,7 @@ impl InstagramMcpServerSse {
 
         if let Err(e) = media_posts_rs {
             return Err(McpError::internal_error(
-                "get_media_posts_failed",
+                "get_media_posts failed",
                 Some(serde_json::json!({ "error": e.to_string() })),
             ));
         }
@@ -237,7 +237,7 @@ impl InstagramMcpServerSse {
         let insights_rs = client.get_media_insights(media_id, mapped_metrics).await;
         if let Err(e) = insights_rs {
             return Err(McpError::internal_error(
-                "get_media_insights_failed",
+                "get_media_insights failed",
                 Some(serde_json::json!({ "error": e.to_string() })),
             ));
         }
@@ -280,7 +280,7 @@ impl InstagramMcpServerSse {
 
         if let Err(e) = publish_result_rs {
             return Err(McpError::internal_error(
-                "publish_media_failed",
+                "publish_media failed",
                 Some(serde_json::json!({ "error": e.to_string() })),
             ));
         }
@@ -303,7 +303,7 @@ impl InstagramMcpServerSse {
 
         if let Err(e) = pages_rs {
             return Err(McpError::internal_error(
-                "get_account_pages_failed",
+                "get_account_pages failed",
                 Some(serde_json::json!({ "error": e.to_string() })),
             ));
         }
@@ -337,7 +337,7 @@ impl InstagramMcpServerSse {
             .await;
         if let Err(e) = insights_rs {
             return Err(McpError::internal_error(
-                "get_account_insights_failed",
+                "get_account_insights failed",
                 Some(serde_json::json!({ "error": e.to_string() })),
             ));
         }
@@ -375,7 +375,7 @@ impl InstagramMcpServerSse {
 
         if let Err(e) = conversations_rs {
             return Err(McpError::internal_error(
-                "get_conversations_failed",
+                "get_conversations failed",
                 Some(serde_json::json!({ "error": e.to_string() })),
             ));
         }
@@ -403,7 +403,7 @@ impl InstagramMcpServerSse {
 
         if let Err(e) = messages_rs {
             return Err(McpError::internal_error(
-                "get_conversation_messages_failed",
+                "get_conversation_messages failed",
                 Some(serde_json::json!({ "error": e.to_string() })),
             ));
         }
@@ -436,7 +436,7 @@ impl InstagramMcpServerSse {
 
         if let Err(e) = response_rs {
             return Err(McpError::internal_error(
-                "send_dm_failed",
+                "send_dm failed",
                 Some(serde_json::json!({ "error": e.to_string() })),
             ));
         }
@@ -480,14 +480,24 @@ impl InstagramMcpServerSse {
         let insights_rs = client.get_media_insights(media_id.to_string(), None).await;
         if let Err(e) = insights_rs {
             return Err(McpError::internal_error(
-                "get_media_insights_failed",
+                "get_media_insights failed",
                 Some(serde_json::json!({ "error": e.to_string() })),
             ));
         }
 
         let insights = insights_rs.unwrap();
         let prompt = format!(
-            "Analyze the engagement metrics for Instagram post {}:\n\nInsights Data:\n{}\n\nPlease provide:\n1. Overall engagement performance assessment\n2. Key metrics analysis (impressions, reach, likes, comments, shares)\n3. Engagement rate calculation and interpretation\n4. Recommendations for improving future posts\n5. Comparison with typical performance benchmarks",
+            "Analyze the engagement metrics for Instagram post {}:
+
+            Insights Data:
+            {}
+
+            Please provide:
+            1. Overall engagement performance assessment
+            2. Key metrics analysis (impressions, reach, likes, comments, shares)
+            3. Engagement rate calculation and interpretation
+            4. Recommendations for improving future posts
+            5. Comparison with typical performance benchmarks",
             media_id,
             serde_json::to_string_pretty(&insights).unwrap_or_else(|_| "[]".to_string())
         );
@@ -513,7 +523,7 @@ impl InstagramMcpServerSse {
 
         if let Err(e) = posts_rs {
             return Err(McpError::internal_error(
-                "get_media_posts_failed",
+                "get_media_posts failed",
                 Some(serde_json::json!({ "error": e.to_string() })),
             ));
         }
@@ -525,7 +535,7 @@ impl InstagramMcpServerSse {
 
         if let Err(e) = account_insights_rs {
             return Err(McpError::internal_error(
-                "get_account_insights_failed",
+                "get_account_insights failed",
                 Some(serde_json::json!({ "error": e.to_string() })),
             ));
         }
@@ -536,7 +546,21 @@ impl InstagramMcpServerSse {
         let time_period_str = time_period.clone().unwrap_or("week".to_string());
 
         let prompt = format!(
-            "Generate a content strategy for Instagram focusing on {} over the {}:\n\nRecent Posts Performance:\n{}\n\nAccount Insights:\n{}\n\nPlease provide:\n1. Content performance analysis\n2. Optimal posting times and frequency\n3. Content type recommendations (images, videos, carousels)\n4. Caption and hashtag strategies\n5. Engagement tactics to improve {}\n6. Specific action items for the next {}",
+            r#"Generate a content strategy for Instagram focusing on {} over the {}:
+
+            Recent Posts Performance:
+            {}
+
+            Account Insights:
+            {}
+
+            Please provide:
+            1. Content performance analysis
+            2. Optimal posting times and frequency
+            3. Content type recommendations (images, videos, carousels)
+            4. Caption and hashtag strategies
+            5. Engagement tactics to improve {}
+            6. Specific action items for the next {}"#,
             focus_area_str,
             time_period_str,
             serde_json::to_string_pretty(&preview_posts).unwrap_or_else(|_| "[]".to_string()),
@@ -566,7 +590,7 @@ impl InstagramMcpServerSse {
 
         if let Err(e) = posts_rs {
             return Err(McpError::internal_error(
-                "get_media_posts_failed",
+                "get_media_posts failed",
                 Some(serde_json::json!({ "error": e.to_string() })),
             ));
         }
@@ -590,7 +614,18 @@ impl InstagramMcpServerSse {
             })
             .collect::<Vec<_>>();
         let prompt = format!(
-            "Analyze hashtag performance for the last {} Instagram posts:\n\nHashtag Data:\n{}\n\nPlease provide:\n1. Most frequently used hashtags\n2. Hashtag performance correlation with engagement\n3. Hashtag diversity analysis\n4. Recommendations for hashtag optimization\n5. Suggested new hashtags to try\n6. Hashtag strategy improvements",
+            r#"Analyze hashtag performance for the last {} Instagram posts:
+
+            Hashtag Data:
+            {}
+
+            Please provide:
+            1. Most frequently used hashtags
+            2. Hashtag performance correlation with engagement
+            3. Hashtag diversity analysis
+            4. Recommendations for hashtag optimization
+            5. Suggested new hashtags to try
+            6. Hashtag strategy improvements"#,
             post_count_value,
             serde_json::to_string_pretty(&hashtags_data).unwrap_or_else(|_| "[]".to_string())
         );
@@ -624,10 +659,11 @@ impl ServerHandler for InstagramMcpServerSse {
         )
         .with_server_info(Implementation::from_build_env())
         .with_protocol_version(ProtocolVersion::V_2024_11_05)
-        .with_instructions(r#"This server provides tools and prompts to interact with instagram.
-         Tools: get_profile_info, get_media_posts, get_media_insights, publish_media, get_account_pages, get_account_insights, validate_access_token, get_conversations, get_conversation_messages, send_dm
-         Prompts: analyze_engagement, content_strategy, hashtag_analysis
-         "#.to_string())
+        .with_instructions(
+            r#"This server provides tools and prompts to interact with instagram.
+               Tools: get_profile_info, get_media_posts, get_media_insights, publish_media, get_account_pages, get_account_insights, validate_access_token, get_conversations, get_conversation_messages, send_dm
+               Prompts: analyze_engagement, content_strategy, hashtag_analysis"#.to_string()
+        )
     }
 
     async fn list_resources(
@@ -698,7 +734,7 @@ impl ServerHandler for InstagramMcpServerSse {
                 )]))
             }
             _ => Err(McpError::resource_not_found(
-                "resource_not_found",
+                "resource not found",
                 Some(serde_json::json!({"uri": uri})),
             )),
         }
