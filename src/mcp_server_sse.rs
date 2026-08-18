@@ -646,7 +646,7 @@ impl ServerHandler for InstagramMcpServerSse {
             .build()
         )
         .with_server_info(Implementation::from_build_env())
-        .with_protocol_version(ProtocolVersion::V_2024_11_05)
+        .with_protocol_version(ProtocolVersion::V_2025_11_25)
         .with_instructions(
             r#"This server provides tools and prompts to interact with instagram.
                Tools: get_profile_info, get_media_posts, get_media_insights, publish_media, get_account_pages, get_account_insights, validate_access_token, get_conversations, get_conversation_messages, send_dm
