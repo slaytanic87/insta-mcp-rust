@@ -2,7 +2,7 @@ use std::sync::{Arc, OnceLock};
 
 use rmcp::{
     ErrorData as McpError, RoleServer, ServerHandler, handler::server::{router::prompt::PromptRouter, tool::ToolRouter, wrapper::Parameters}, model::{
-        CallToolResult, ContentBlock, Implementation, InitializeRequestParams, InitializeResult, ListResourceTemplatesResult, ListResourcesResult, MetaObject, PaginatedRequestParams, PromptMessage, ProtocolVersion, ReadResourceRequestParams, ReadResourceResponse, ReadResourceResult, Resource, ResourceContents, Role, ServerCapabilities, ServerInfo,
+        CallToolResult, ContentBlock, Implementation, InitializeRequestParams, InitializeResult, ListResourceTemplatesResult, ListResourcesResult, MetaObject, PaginatedRequestParams, PromptMessage, ProtocolVersion, ReadResourceRequestParams, ReadResourceResponse, ReadResourceResult, Resource, ResourceContents, Role, ServerCapabilities, ServerConfig,
     }, prompt, prompt_router, schemars, service::RequestContext, tool, tool_handler, tool_router, transport::{
         StreamableHttpServerConfig, StreamableHttpService,
         streamable_http_server::session::local::{LocalSessionManager, SessionConfig},
@@ -637,8 +637,8 @@ impl ServerHandler for InstagramMcpServerSse {
         Ok(self.get_info())
     }
 
-    fn get_info(&self) -> ServerInfo {
-        ServerInfo::new(
+    fn get_info(&self) -> ServerConfig {
+        ServerConfig::new(
             ServerCapabilities::builder()
             .enable_prompts()
             .enable_resources()
